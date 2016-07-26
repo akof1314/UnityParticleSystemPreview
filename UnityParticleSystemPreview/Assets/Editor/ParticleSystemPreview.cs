@@ -8,6 +8,7 @@ public class ParticleSystemPreview : ObjectPreview
 {
     private class Styles
     {
+		public GUIContent speedScale = EditorGUIUtility.IconContent("SpeedScale", "Changes animation preview speed");
         public GUIContent pivot = EditorGUIUtility.IconContent("AvatarPivot", "Displays avatar's pivot and mass center");
         public GUIContent[] play = new GUIContent[2]
         {
@@ -15,6 +16,9 @@ public class ParticleSystemPreview : ObjectPreview
             EditorGUIUtility.IconContent("preAudioPlayOn", "Stop")
         };
         public GUIStyle preButton = "preButton";
+        public GUIStyle preSlider = "preSlider";
+        public GUIStyle preSliderThumb = "preSliderThumb";
+        public GUIStyle preLabel = "preLabel";
     }
 
     protected enum ViewTool
@@ -40,7 +44,6 @@ public class ParticleSystemPreview : ObjectPreview
     private Mesh m_FloorPlane;
     private Texture2D m_FloorTexture;
     private Material m_FloorMaterial;
-    private Material m_FloorMaterialSmall;
     private float m_AvatarScale = 1f;
     private float m_ZoomFactor = 1f;
     private Vector3 m_PivotPositionOffset = Vector3.zero;
@@ -49,6 +52,7 @@ public class ParticleSystemPreview : ObjectPreview
     private bool m_ShowReference;
     private int m_PreviewHint = "Preview".GetHashCode();
     private int m_PreviewSceneHint = "PreviewSene".GetHashCode();
+    public float m_PlaybackSpeed = 1f;
 
     private bool m_Playing;
     private float m_RunningTime;
@@ -154,9 +158,6 @@ public class ParticleSystemPreview : ObjectPreview
             m_FloorMaterial.mainTextureScale = Vector2.one * 5f * 4f;
             m_FloorMaterial.SetVector("_Alphas", new Vector4(0.5f, 0.3f, 0f, 0f));
             m_FloorMaterial.hideFlags = HideFlags.HideAndDontSave;
-            m_FloorMaterialSmall = new Material(m_FloorMaterial);
-            m_FloorMaterialSmall.mainTextureScale = Vector2.one * 0.2f * 4f;
-            m_FloorMaterialSmall.hideFlags = HideFlags.HideAndDontSave;
         }
 
         if (m_ReferenceInstance == null)
@@ -189,7 +190,7 @@ public class ParticleSystemPreview : ObjectPreview
 
     public override bool HasPreviewGUI()
     {
-        return EditorUtility.IsPersistent(this.target) && this.HasStaticPreview();
+        return EditorUtility.IsPersistent(target) && HasStaticPreview();
     }
 
     public override void OnPreviewGUI(Rect r, GUIStyle background)
@@ -241,7 +242,7 @@ public class ParticleSystemPreview : ObjectPreview
         m_ShowReference = GUILayout.Toggle(m_ShowReference, s_Styles.pivot, s_Styles.preButton);
         if (EditorGUI.EndChangeCheck())
         {
-            EditorPrefs.SetBool("AvatarpreviewShowReference", this.m_ShowReference);
+            EditorPrefs.SetBool("AvatarpreviewShowReference", m_ShowReference);
         }
 
         bool flag = CycleButton(!m_Playing ? 0 : 1, s_Styles.play, s_Styles.preButton) != 0;
@@ -256,6 +257,14 @@ public class ParticleSystemPreview : ObjectPreview
                 SimulateDisable();
             }
         }
+
+        GUILayout.Box(s_Styles.speedScale, s_Styles.preLabel);
+        EditorGUI.BeginChangeCheck();
+        m_PlaybackSpeed = PreviewSlider(m_PlaybackSpeed, 0.03f);
+        if (EditorGUI.EndChangeCheck())
+        {
+        }
+        GUILayout.Label(m_PlaybackSpeed.ToString("f2"), s_Styles.preLabel);
     }
 
     public override void ReloadPreviewInstances()
@@ -270,11 +279,11 @@ public class ParticleSystemPreview : ObjectPreview
 
     private bool HasStaticPreview()
     {
-        if (this.target == null)
+        if (target == null)
         {
             return false;
         }
-        GameObject gameObject = this.target as GameObject;
+        GameObject gameObject = target as GameObject;
         return gameObject.GetComponentInChildren<ParticleSystem>(true);
     }
 
@@ -316,61 +325,6 @@ public class ParticleSystemPreview : ObjectPreview
         TeardownPreviewLightingAndFx(oldFog);
     }
 
-    public static void SetEnabledRecursive(GameObject go, bool enabled)
-    {
-        Renderer[] componentsInChildren = go.GetComponentsInChildren<Renderer>();
-        for (int i = 0; i < componentsInChildren.Length; i++)
-        {
-            Renderer renderer = componentsInChildren[i];
-            renderer.enabled = enabled;
-        }
-    }
-
-    public static void GetRenderableBoundsRecurse(ref Bounds bounds, GameObject go)
-    {
-        MeshRenderer meshRenderer = go.GetComponent(typeof(MeshRenderer)) as MeshRenderer;
-        MeshFilter meshFilter = go.GetComponent(typeof(MeshFilter)) as MeshFilter;
-        if (meshRenderer && meshFilter && meshFilter.sharedMesh)
-        {
-            if (bounds.extents == Vector3.zero)
-            {
-                bounds = meshRenderer.bounds;
-            }
-            else
-            {
-                bounds.Encapsulate(meshRenderer.bounds);
-            }
-        }
-        SkinnedMeshRenderer skinnedMeshRenderer = go.GetComponent(typeof(SkinnedMeshRenderer)) as SkinnedMeshRenderer;
-        if (skinnedMeshRenderer && skinnedMeshRenderer.sharedMesh)
-        {
-            if (bounds.extents == Vector3.zero)
-            {
-                bounds = skinnedMeshRenderer.bounds;
-            }
-            else
-            {
-                bounds.Encapsulate(skinnedMeshRenderer.bounds);
-            }
-        }
-        SpriteRenderer spriteRenderer = go.GetComponent(typeof(SpriteRenderer)) as SpriteRenderer;
-        if (spriteRenderer && spriteRenderer.sprite)
-        {
-            if (bounds.extents == Vector3.zero)
-            {
-                bounds = spriteRenderer.bounds;
-            }
-            else
-            {
-                bounds.Encapsulate(spriteRenderer.bounds);
-            }
-        }
-        foreach (Transform transform in go.transform)
-        {
-            GetRenderableBoundsRecurse(ref bounds, transform.gameObject);
-        }
-    }
-
     private void CreatePreviewInstances()
     {
         Debug.Log("ParticleSystemPreview CreatePreviewInstances()");
@@ -406,7 +360,6 @@ public class ParticleSystemPreview : ObjectPreview
         }
         UnityEngine.Object.DestroyImmediate(m_PreviewInstance);
         UnityEngine.Object.DestroyImmediate(m_FloorMaterial);
-        UnityEngine.Object.DestroyImmediate(m_FloorMaterialSmall);
         UnityEngine.Object.DestroyImmediate(m_ReferenceInstance);
         UnityEngine.Object.DestroyImmediate(m_RootInstance);
         UnityEngine.Object.DestroyImmediate(m_PivotInstance);
@@ -460,16 +413,6 @@ public class ParticleSystemPreview : ObjectPreview
         m_RootInstance.transform.localScale = Vector3.one * scale * 0.25f;
     }
 
-    private static void InitInstantiatedPreviewRecursive(GameObject go)
-    {
-        go.hideFlags = HideFlags.HideAndDontSave;
-        go.layer = PreviewCullingLayer;
-        foreach (Transform transform in go.transform)
-        {
-            InitInstantiatedPreviewRecursive(transform.gameObject);
-        }
-    }
-
     public void OnDestroy()
     {
         Debug.Log("ParticleSystemPreview OnDestroy()");
@@ -505,6 +448,7 @@ public class ParticleSystemPreview : ObjectPreview
         ParticleSystem particleSystem = gameObject.GetComponentInChildren<ParticleSystem>(true);
         if (particleSystem)
         {
+            particleSystem.playbackSpeed = m_PlaybackSpeed;
             particleSystem.Simulate(m_RunningTime, true);
             InspectorWindowUtil.Init();
             InspectorWindowUtil.repaintAllInspectors();
@@ -638,6 +582,123 @@ public class ParticleSystemPreview : ObjectPreview
         m_ZoomFactor += m_ZoomFactor * num;
         m_ZoomFactor = Mathf.Max(m_ZoomFactor, m_AvatarScale / 10f);
         evt.Use();
+    }
+
+    private float PreviewSlider(float val, float snapThreshold)
+    {
+        val = GUILayout.HorizontalSlider(val, 0.1f, 3f, s_Styles.preSlider, s_Styles.preSliderThumb, GUILayout.MaxWidth(64f));
+        if (val > 0.25f - snapThreshold && val < 0.25f + snapThreshold)
+        {
+            val = 0.25f;
+        }
+        else
+        {
+            if (val > 0.5f - snapThreshold && val < 0.5f + snapThreshold)
+            {
+                val = 0.5f;
+            }
+            else
+            {
+                if (val > 0.75f - snapThreshold && val < 0.75f + snapThreshold)
+                {
+                    val = 0.75f;
+                }
+                else
+                {
+                    if (val > 1f - snapThreshold && val < 1f + snapThreshold)
+                    {
+                        val = 1f;
+                    }
+                    else
+                    {
+                        if (val > 1.25f - snapThreshold && val < 1.25f + snapThreshold)
+                        {
+                            val = 1.25f;
+                        }
+                        else
+                        {
+                            if (val > 1.5f - snapThreshold && val < 1.5f + snapThreshold)
+                            {
+                                val = 1.5f;
+                            }
+                            else
+                            {
+                                if (val > 1.75f - snapThreshold && val < 1.75f + snapThreshold)
+                                {
+                                    val = 1.75f;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return val;
+    }
+
+    public static void SetEnabledRecursive(GameObject go, bool enabled)
+    {
+        Renderer[] componentsInChildren = go.GetComponentsInChildren<Renderer>();
+        for (int i = 0; i < componentsInChildren.Length; i++)
+        {
+            Renderer renderer = componentsInChildren[i];
+            renderer.enabled = enabled;
+        }
+    }
+
+    public static void GetRenderableBoundsRecurse(ref Bounds bounds, GameObject go)
+    {
+        MeshRenderer meshRenderer = go.GetComponent(typeof(MeshRenderer)) as MeshRenderer;
+        MeshFilter meshFilter = go.GetComponent(typeof(MeshFilter)) as MeshFilter;
+        if (meshRenderer && meshFilter && meshFilter.sharedMesh)
+        {
+            if (bounds.extents == Vector3.zero)
+            {
+                bounds = meshRenderer.bounds;
+            }
+            else
+            {
+                bounds.Encapsulate(meshRenderer.bounds);
+            }
+        }
+        SkinnedMeshRenderer skinnedMeshRenderer = go.GetComponent(typeof(SkinnedMeshRenderer)) as SkinnedMeshRenderer;
+        if (skinnedMeshRenderer && skinnedMeshRenderer.sharedMesh)
+        {
+            if (bounds.extents == Vector3.zero)
+            {
+                bounds = skinnedMeshRenderer.bounds;
+            }
+            else
+            {
+                bounds.Encapsulate(skinnedMeshRenderer.bounds);
+            }
+        }
+        SpriteRenderer spriteRenderer = go.GetComponent(typeof(SpriteRenderer)) as SpriteRenderer;
+        if (spriteRenderer && spriteRenderer.sprite)
+        {
+            if (bounds.extents == Vector3.zero)
+            {
+                bounds = spriteRenderer.bounds;
+            }
+            else
+            {
+                bounds.Encapsulate(spriteRenderer.bounds);
+            }
+        }
+        foreach (Transform transform in go.transform)
+        {
+            GetRenderableBoundsRecurse(ref bounds, transform.gameObject);
+        }
+    }
+
+    private static void InitInstantiatedPreviewRecursive(GameObject go)
+    {
+        go.hideFlags = HideFlags.HideAndDontSave;
+        go.layer = PreviewCullingLayer;
+        foreach (Transform transform in go.transform)
+        {
+            InitInstantiatedPreviewRecursive(transform.gameObject);
+        }
     }
 
     private static int CycleButton(int selected, GUIContent[] contents, GUIStyle style)
