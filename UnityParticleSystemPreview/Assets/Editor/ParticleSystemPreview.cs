@@ -5,13 +5,37 @@ using UnityEngine;
 [CustomPreview(typeof(GameObject))]
 public class ParticleSystemPreview : ObjectPreview
 {
+    protected enum ViewTool
+    {
+        None,
+        Pan,
+        Zoom,
+        Orbit
+    }
+
     private PreviewRenderUtility m_PreviewUtility;
+    // 预览实例对象
     private GameObject m_PreviewInstance;
-    private Vector2 m_PreviewDir;
+    // 原点圆形标识
+    private GameObject m_ReferenceInstance;
+    // 方向箭头标识
+    private GameObject m_DirectionInstance;
+    // 轴三箭头标识
+    private GameObject m_PivotInstance;
+    // 根三箭头标识
+    private GameObject m_RootInstance;
+    private Vector2 m_PreviewDir = new Vector2(120f, -20f);
     private Mesh m_FloorPlane;
     private Texture2D m_FloorTexture;
     private Material m_FloorMaterial;
     private Material m_FloorMaterialSmall;
+    private float m_AvatarScale = 1f;
+    private float m_ZoomFactor = 1f;
+    private Vector3 m_PivotPositionOffset = Vector3.zero;
+    private float m_BoundingVolumeScale;
+    protected ViewTool m_ViewTool;
+    private int m_PreviewHint = "Preview".GetHashCode();
+    private int m_PreviewSceneHint = "PreviewSene".GetHashCode();
 
     private bool m_Playing;
     private float m_RunningTime;
@@ -20,6 +44,62 @@ public class ParticleSystemPreview : ObjectPreview
     private static GUIContent[] s_PlayIcons = new GUIContent[2];
     private static int PreviewCullingLayer = 31;
 
+    public Vector3 bodyPosition
+    {
+        get { return m_PreviewInstance.transform.position; }
+    }
+
+    protected ViewTool viewTool
+    {
+        get
+        {
+            Event current = Event.current;
+            if (m_ViewTool == ViewTool.None)
+            {
+                bool flag = current.control && Application.platform == RuntimePlatform.OSXEditor;
+                bool actionKey = EditorGUI.actionKey;
+                bool flag2 = !actionKey && !flag && !current.alt;
+                if ((current.button <= 0 && flag2) || (current.button <= 0 && actionKey) || current.button == 2)
+                {
+                    m_ViewTool = ViewTool.Pan;
+                }
+                else
+                {
+                    if ((current.button <= 0 && flag) || (current.button == 1 && current.alt))
+                    {
+                        m_ViewTool = ViewTool.Zoom;
+                    }
+                    else
+                    {
+                        if ((current.button <= 0 && current.alt) || current.button == 1)
+                        {
+                            m_ViewTool = ViewTool.Orbit;
+                        }
+                    }
+                }
+            }
+            return m_ViewTool;
+        }
+    }
+
+    protected MouseCursor currentCursor
+    {
+        get
+        {
+            switch (m_ViewTool)
+            {
+                case ViewTool.Pan:
+                    return MouseCursor.Pan;
+                case ViewTool.Zoom:
+                    return MouseCursor.Zoom;
+                case ViewTool.Orbit:
+                    return MouseCursor.Orbit;
+                default:
+                    return MouseCursor.Arrow;
+            }
+        }
+    }
+
     public override void Initialize(Object[] targets)
     {
         base.Initialize(targets);
@@ -27,31 +107,56 @@ public class ParticleSystemPreview : ObjectPreview
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
             m_PreviewUtility.m_CameraFieldOfView = 30f;
-			m_PreviewUtility.m_Camera.cullingMask = -2147483648;
+            m_PreviewUtility.m_Camera.cullingMask = 1 << PreviewCullingLayer;
             CreatePreviewInstances();
 
             s_PlayIcons[0] = EditorGUIUtility.IconContent("preAudioPlayOff", "Play");
             s_PlayIcons[1] = EditorGUIUtility.IconContent("preAudioPlayOn", "Stop");
         }
-        if (this.m_FloorPlane == null)
+        if (m_FloorPlane == null)
         {
-            this.m_FloorPlane = (Resources.GetBuiltinResource(typeof(Mesh), "New-Plane.fbx") as Mesh);
+            m_FloorPlane = (Resources.GetBuiltinResource(typeof(Mesh), "New-Plane.fbx") as Mesh);
         }
-        if (this.m_FloorTexture == null)
+        if (m_FloorTexture == null)
         {
-            this.m_FloorTexture = (Texture2D)EditorGUIUtility.Load("Avatar/Textures/AvatarFloor.png");
+            m_FloorTexture = (Texture2D)EditorGUIUtility.Load("Avatar/Textures/AvatarFloor.png");
         }
-        if (this.m_FloorMaterial == null)
+        if (m_FloorMaterial == null)
         {
             Shader shader = EditorGUIUtility.LoadRequired("Previews/PreviewPlaneWithShadow.shader") as Shader;
-            this.m_FloorMaterial = new Material(shader);
-            this.m_FloorMaterial.mainTexture = this.m_FloorTexture;
-            this.m_FloorMaterial.mainTextureScale = Vector2.one * 5f * 4f;
-            this.m_FloorMaterial.SetVector("_Alphas", new Vector4(0.5f, 0.3f, 0f, 0f));
-            this.m_FloorMaterial.hideFlags = HideFlags.HideAndDontSave;
-            this.m_FloorMaterialSmall = new Material(this.m_FloorMaterial);
-            this.m_FloorMaterialSmall.mainTextureScale = Vector2.one * 0.2f * 4f;
-            this.m_FloorMaterialSmall.hideFlags = HideFlags.HideAndDontSave;
+            m_FloorMaterial = new Material(shader);
+            m_FloorMaterial.mainTexture = m_FloorTexture;
+            m_FloorMaterial.mainTextureScale = Vector2.one * 5f * 4f;
+            m_FloorMaterial.SetVector("_Alphas", new Vector4(0.5f, 0.3f, 0f, 0f));
+            m_FloorMaterial.hideFlags = HideFlags.HideAndDontSave;
+            m_FloorMaterialSmall = new Material(m_FloorMaterial);
+            m_FloorMaterialSmall.mainTextureScale = Vector2.one * 0.2f * 4f;
+            m_FloorMaterialSmall.hideFlags = HideFlags.HideAndDontSave;
+        }
+
+        if (m_ReferenceInstance == null)
+        {
+            GameObject original = (GameObject)EditorGUIUtility.Load("Avatar/dial_flat.prefab");
+            m_ReferenceInstance = (GameObject)UnityEngine.Object.Instantiate(original, Vector3.zero, Quaternion.identity);
+            InitInstantiatedPreviewRecursive(m_ReferenceInstance);
+        }
+        if (m_DirectionInstance == null)
+        {
+            GameObject original2 = (GameObject)EditorGUIUtility.Load("Avatar/arrow.fbx");
+            m_DirectionInstance = (GameObject)UnityEngine.Object.Instantiate(original2, Vector3.zero, Quaternion.identity);
+            InitInstantiatedPreviewRecursive(m_DirectionInstance);
+        }
+        if (m_PivotInstance == null)
+        {
+            GameObject original3 = (GameObject)EditorGUIUtility.Load("Avatar/root.fbx");
+            m_PivotInstance = (GameObject)UnityEngine.Object.Instantiate(original3, Vector3.zero, Quaternion.identity);
+            InitInstantiatedPreviewRecursive(m_PivotInstance);
+        }
+        if (m_RootInstance == null)
+        {
+            GameObject original4 = (GameObject)EditorGUIUtility.Load("Avatar/root.fbx");
+            m_RootInstance = (GameObject)UnityEngine.Object.Instantiate(original4, Vector3.zero, Quaternion.identity);
+            InitInstantiatedPreviewRecursive(m_RootInstance);
         }
     }
 
@@ -62,16 +167,28 @@ public class ParticleSystemPreview : ObjectPreview
 
     public override void OnPreviewGUI(Rect r, GUIStyle background)
     {
-        m_PreviewDir = Drag2D(m_PreviewDir, r);
-        if (Event.current.type != EventType.Repaint)
+        Rect rect2 = r;
+        int controlID = GUIUtility.GetControlID(m_PreviewHint, FocusType.Native, rect2);
+        Event current = Event.current;
+        EventType typeForControl = current.GetTypeForControl(controlID);
+
+        if (typeForControl == EventType.Repaint)
         {
-            return;
+            m_PreviewUtility.BeginPreview(rect2, background);
+            DoRenderPreview();
+            m_PreviewUtility.EndAndDrawPreview(rect2);
         }
-        m_PreviewUtility.BeginPreview(r, background);
-        DoRenderPreview();
-        m_PreviewUtility.EndAndDrawPreview(r);
+
+        int controlID2 = GUIUtility.GetControlID(m_PreviewSceneHint, FocusType.Native);
+        typeForControl = current.GetTypeForControl(controlID2);
+        HandleViewTool(current, typeForControl, controlID2, rect2);
 
         EditorGUI.DropShadowLabel(new Rect(r.x, r.yMax - 20f, r.width, 20f), "Playback Time:" + m_RunningTime);
+
+        if (current.type == EventType.Repaint)
+        {
+            EditorGUIUtility.AddCursorRect(rect2, currentCursor);
+        }
     }
 
     public override GUIContent GetPreviewTitle()
@@ -104,46 +221,81 @@ public class ParticleSystemPreview : ObjectPreview
 
     private void DoRenderPreview()
     {
-        GameObject gameObject = m_PreviewInstance;
-        Bounds bounds = new Bounds(gameObject.transform.position, Vector3.zero);
-        GetRenderableBoundsRecurse(ref bounds, gameObject);
-        float num = Mathf.Max(bounds.extents.magnitude, 0.0001f);
-        float num2 = num * 3.8f;
-        Quaternion quaternion = Quaternion.Euler(-this.m_PreviewDir.y, -this.m_PreviewDir.x, 0f);
-        Vector3 position = bounds.center - quaternion * (Vector3.forward * num2);
-        this.m_PreviewUtility.m_Camera.transform.position = position;
-        this.m_PreviewUtility.m_Camera.transform.rotation = quaternion;
-        this.m_PreviewUtility.m_Camera.nearClipPlane = num2 - num * 1.1f;
-        this.m_PreviewUtility.m_Camera.farClipPlane = num2 + num * 1.1f;
-        this.m_PreviewUtility.m_Light[0].intensity = 0.7f;
-        this.m_PreviewUtility.m_Light[0].transform.rotation = quaternion * Quaternion.Euler(40f, 40f, 0f);
-        this.m_PreviewUtility.m_Light[1].intensity = 0.7f;
-        this.m_PreviewUtility.m_Light[1].transform.rotation = quaternion * Quaternion.Euler(340f, 218f, 177f);
-        Color ambient = new Color(0.1f, 0.1f, 0.1f, 0f);
-        InternalEditorUtility.SetCustomLighting(this.m_PreviewUtility.m_Light, ambient);
-        bool fog = RenderSettings.fog;
-        Unsupported.SetRenderSettingsUseFogNoDirty(false);
+        Vector3 bodyPosition = this.bodyPosition;
+        Quaternion quaternion = Quaternion.identity;
+        Vector3 vector = Vector3.zero;
+        Quaternion quaternion2 = Quaternion.identity;
+        Vector3 pivotPos = Vector3.zero;
 
-        this.m_PreviewUtility.m_Camera.nearClipPlane = 0.5f * 1;
-        this.m_PreviewUtility.m_Camera.farClipPlane = 100f * 1;
+        bool oldFog = this.SetupPreviewLightingAndFx();
+        Vector3 forward = quaternion2 * Vector3.forward;
+        forward[1] = 0f;
+        Quaternion directionRot = Quaternion.LookRotation(forward);
+        Vector3 directionPos = vector;
+        Quaternion pivotRot = quaternion;
+        this.PositionPreviewObjects(pivotRot, pivotPos, quaternion2, bodyPosition, directionRot, quaternion, vector, directionPos, this.m_AvatarScale);
+
+        this.m_PreviewUtility.m_Camera.nearClipPlane = 0.5f * this.m_ZoomFactor;
+        this.m_PreviewUtility.m_Camera.farClipPlane = 100f * this.m_AvatarScale;
         Quaternion rotation = Quaternion.Euler(-this.m_PreviewDir.y, -this.m_PreviewDir.x, 0f);
-        Vector3 position2 = rotation * (Vector3.forward * -5.5f * 1) ;
+        Vector3 position2 = rotation * (Vector3.forward * -5.5f * this.m_ZoomFactor) + bodyPosition + this.m_PivotPositionOffset;
         this.m_PreviewUtility.m_Camera.transform.position = position2;
         this.m_PreviewUtility.m_Camera.transform.rotation = rotation;
+
         Quaternion identity = Quaternion.identity;
+        Vector3 position = new Vector3(0f, 0f, 0f);
+        position = this.m_ReferenceInstance.transform.position;
         Material floorMaterial = this.m_FloorMaterial;
-        Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * 1f);
-        //floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / this.m_AvatarScale);
-        //floorMaterial.SetTexture("_ShadowTexture", renderTexture);
-        //floorMaterial.SetMatrix("_ShadowTextureMatrix", matrix);
-        //floorMaterial.SetVector("_Alphas", new Vector4(0.5f * num3, 0.3f * num3, 0f, 0f));
+        Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * this.m_AvatarScale);
+        floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / this.m_AvatarScale);
+        floorMaterial.SetVector("_Alphas", new Vector4(0.5f * 1f, 0.3f * 1f, 0f, 0f));
         Graphics.DrawMesh(this.m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, this.m_PreviewUtility.m_Camera, 0);
 
-        SetEnabledRecursive(gameObject, true);
+        this.SetPreviewCharacterEnabled(true, true);
         this.m_PreviewUtility.m_Camera.Render();
-        SetEnabledRecursive(gameObject, false);
-        Unsupported.SetRenderSettingsUseFogNoDirty(fog);
-        InternalEditorUtility.RemoveCustomLighting();
+        this.SetPreviewCharacterEnabled(false, false);
+        TeardownPreviewLightingAndFx(oldFog);
+
+        //GameObject gameObject = m_PreviewInstance;
+        //Bounds bounds = new Bounds(gameObject.transform.position, Vector3.zero);
+        //GetRenderableBoundsRecurse(ref bounds, gameObject);
+        //float num = Mathf.Max(bounds.extents.magnitude, 0.0001f);
+        //float num2 = num * 3.8f;
+        //Quaternion quaternion = Quaternion.Euler(-m_PreviewDir.y, -m_PreviewDir.x, 0f);
+        //Vector3 position = bounds.center - quaternion * (Vector3.forward * num2);
+        //m_PreviewUtility.m_Camera.transform.position = position;
+        //m_PreviewUtility.m_Camera.transform.rotation = quaternion;
+        //m_PreviewUtility.m_Camera.nearClipPlane = num2 - num * 1.1f;
+        //m_PreviewUtility.m_Camera.farClipPlane = num2 + num * 1.1f;
+        //m_PreviewUtility.m_Light[0].intensity = 0.7f;
+        //m_PreviewUtility.m_Light[0].transform.rotation = quaternion * Quaternion.Euler(40f, 40f, 0f);
+        //m_PreviewUtility.m_Light[1].intensity = 0.7f;
+        //m_PreviewUtility.m_Light[1].transform.rotation = quaternion * Quaternion.Euler(340f, 218f, 177f);
+        //Color ambient = new Color(0.1f, 0.1f, 0.1f, 0f);
+        //InternalEditorUtility.SetCustomLighting(m_PreviewUtility.m_Light, ambient);
+        //bool fog = RenderSettings.fog;
+        //Unsupported.SetRenderSettingsUseFogNoDirty(false);
+
+        //m_PreviewUtility.m_Camera.nearClipPlane = 0.5f * 1;
+        //m_PreviewUtility.m_Camera.farClipPlane = 100f * 1;
+        //Quaternion rotation = Quaternion.Euler(-m_PreviewDir.y, -m_PreviewDir.x, 0f);
+        //Vector3 position2 = rotation * (Vector3.forward * -5.5f * 1);
+        //m_PreviewUtility.m_Camera.transform.position = position2;
+        //m_PreviewUtility.m_Camera.transform.rotation = rotation;
+        //Quaternion identity = Quaternion.identity;
+        //Material floorMaterial = m_FloorMaterial;
+        //Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * 1f);
+        ////floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / m_AvatarScale);
+        ////floorMaterial.SetTexture("_ShadowTexture", renderTexture);
+        ////floorMaterial.SetMatrix("_ShadowTextureMatrix", matrix);
+        ////floorMaterial.SetVector("_Alphas", new Vector4(0.5f * num3, 0.3f * num3, 0f, 0f));
+        //Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, m_PreviewUtility.m_Camera, 0);
+
+        //SetEnabledRecursive(gameObject, true);
+        //m_PreviewUtility.m_Camera.Render();
+        //SetEnabledRecursive(gameObject, false);
+        //Unsupported.SetRenderSettingsUseFogNoDirty(fog);
+        //InternalEditorUtility.RemoveCustomLighting();
     }
 
     public static void SetEnabledRecursive(GameObject go, bool enabled)
@@ -217,7 +369,13 @@ public class ParticleSystemPreview : ObjectPreview
         }
         SetEnabledRecursive(gameObject, false);
         m_PreviewInstance = gameObject;
+
+        Bounds bounds = new Bounds(m_PreviewInstance.transform.position, Vector3.zero);
+        GetRenderableBoundsRecurse(ref bounds, m_PreviewInstance);
+        m_BoundingVolumeScale = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
+        m_AvatarScale = (m_ZoomFactor = m_BoundingVolumeScale / 2f);
     }
+
     private void DestroyPreviewInstances()
     {
         if (m_PreviewInstance == null)
@@ -225,11 +383,63 @@ public class ParticleSystemPreview : ObjectPreview
             return;
         }
         UnityEngine.Object.DestroyImmediate(m_PreviewInstance);
+        UnityEngine.Object.DestroyImmediate(m_FloorMaterial);
+        UnityEngine.Object.DestroyImmediate(m_FloorMaterialSmall);
+        UnityEngine.Object.DestroyImmediate(m_ReferenceInstance);
+        UnityEngine.Object.DestroyImmediate(m_RootInstance);
+        UnityEngine.Object.DestroyImmediate(m_PivotInstance);
+        UnityEngine.Object.DestroyImmediate(m_DirectionInstance);
+    }
+
+    private bool SetupPreviewLightingAndFx()
+    {
+        this.m_PreviewUtility.m_Light[0].intensity = 1.4f;
+        this.m_PreviewUtility.m_Light[0].transform.rotation = Quaternion.Euler(40f, 40f, 0f);
+        this.m_PreviewUtility.m_Light[1].intensity = 1.4f;
+        Color ambient = new Color(0.1f, 0.1f, 0.1f, 0f);
+        InternalEditorUtility.SetCustomLighting(this.m_PreviewUtility.m_Light, ambient);
+        bool fog = RenderSettings.fog;
+        Unsupported.SetRenderSettingsUseFogNoDirty(false);
+        return fog;
+    }
+
+    private static void TeardownPreviewLightingAndFx(bool oldFog)
+    {
+        Unsupported.SetRenderSettingsUseFogNoDirty(oldFog);
+        InternalEditorUtility.RemoveCustomLighting();
+    }
+
+    private void SetPreviewCharacterEnabled(bool enabled, bool showReference)
+    {
+        if (m_PreviewInstance != null)
+        {
+            SetEnabledRecursive(m_PreviewInstance, enabled);
+        }
+        SetEnabledRecursive(m_ReferenceInstance, showReference && enabled);
+        SetEnabledRecursive(m_DirectionInstance, showReference && enabled);
+        SetEnabledRecursive(m_PivotInstance, showReference && enabled);
+        SetEnabledRecursive(m_RootInstance, showReference && enabled);
+    }
+
+    private void PositionPreviewObjects(Quaternion pivotRot, Vector3 pivotPos, Quaternion bodyRot, Vector3 bodyPos,
+        Quaternion directionRot, Quaternion rootRot, Vector3 rootPos, Vector3 directionPos, float scale)
+    {
+        m_ReferenceInstance.transform.position = rootPos;
+        m_ReferenceInstance.transform.rotation = rootRot;
+        m_ReferenceInstance.transform.localScale = Vector3.one * scale * 1.25f;
+        m_DirectionInstance.transform.position = directionPos;
+        m_DirectionInstance.transform.rotation = directionRot;
+        m_DirectionInstance.transform.localScale = Vector3.one * scale * 2f;
+        m_PivotInstance.transform.position = pivotPos;
+        m_PivotInstance.transform.rotation = pivotRot;
+        m_PivotInstance.transform.localScale = Vector3.one * scale * 0.1f;
+        m_RootInstance.transform.position = bodyPos;
+        m_RootInstance.transform.rotation = bodyRot;
+        m_RootInstance.transform.localScale = Vector3.one * scale * 0.25f;
     }
 
     private static void InitInstantiatedPreviewRecursive(GameObject go)
     {
-        //go.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
         go.hideFlags = HideFlags.HideAndDontSave;
         go.layer = PreviewCullingLayer;
         foreach (Transform transform in go.transform)
@@ -290,6 +500,123 @@ public class ParticleSystemPreview : ObjectPreview
         }
     }
 
+    protected void HandleMouseDown(Event evt, int id, Rect previewRect)
+    {
+        if (viewTool != ViewTool.None && previewRect.Contains(evt.mousePosition))
+        {
+            EditorGUIUtility.SetWantsMouseJumping(1);
+            evt.Use();
+            GUIUtility.hotControl = id;
+        }
+    }
+
+    protected void HandleMouseUp(Event evt, int id)
+    {
+        if (GUIUtility.hotControl == id)
+        {
+            m_ViewTool = ViewTool.None;
+            GUIUtility.hotControl = 0;
+            EditorGUIUtility.SetWantsMouseJumping(0);
+            evt.Use();
+        }
+    }
+
+    protected void HandleMouseDrag(Event evt, int id, Rect previewRect)
+    {
+        if (m_PreviewInstance == null)
+        {
+            return;
+        }
+        if (GUIUtility.hotControl == id)
+        {
+            switch (m_ViewTool)
+            {
+                case ViewTool.Pan:
+                    DoAvatarPreviewPan(evt);
+                    break;
+                case ViewTool.Zoom:
+                    DoAvatarPreviewZoom(evt, -HandleUtility.niceMouseDeltaZoom * ((!evt.shift) ? 0.5f : 2f));
+                    break;
+                case ViewTool.Orbit:
+                    DoAvatarPreviewOrbit(evt, previewRect);
+                    break;
+                default:
+                    Debug.Log("Enum value not handled");
+                    break;
+            }
+        }
+    }
+
+    protected void HandleViewTool(Event evt, EventType eventType, int id, Rect previewRect)
+    {
+        switch (eventType)
+        {
+            case EventType.MouseDown:
+                HandleMouseDown(evt, id, previewRect);
+                break;
+            case EventType.MouseUp:
+                HandleMouseUp(evt, id);
+                break;
+            case EventType.MouseDrag:
+                HandleMouseDrag(evt, id, previewRect);
+                break;
+            case EventType.ScrollWheel:
+                DoAvatarPreviewZoom(evt, HandleUtility.niceMouseDeltaZoom * ((!evt.shift) ? 0.5f : 2f));
+                break;
+        }
+    }
+
+    public void DoAvatarPreviewOrbit(Event evt, Rect previewRect)
+    {
+        m_PreviewDir -= evt.delta * (float)((!evt.shift) ? 1 : 3) / Mathf.Min(previewRect.width, previewRect.height) * 140f;
+        m_PreviewDir.y = Mathf.Clamp(m_PreviewDir.y, -90f, 90f);
+        evt.Use();
+    }
+
+    public void DoAvatarPreviewPan(Event evt)
+    {
+        Camera camera = m_PreviewUtility.m_Camera;
+        Vector3 vector = camera.WorldToScreenPoint(bodyPosition + m_PivotPositionOffset);
+        Vector3 a = new Vector3(-evt.delta.x, evt.delta.y, 0f);
+        vector += a * Mathf.Lerp(0.25f, 2f, m_ZoomFactor * 0.5f);
+        Vector3 b = camera.ScreenToWorldPoint(vector) - (bodyPosition + m_PivotPositionOffset);
+        m_PivotPositionOffset += b;
+        evt.Use();
+    }
+
+    public void DoAvatarPreviewFrame(Event evt, EventType type, Rect previewRect)
+    {
+        if (type == EventType.KeyDown && evt.keyCode == KeyCode.F)
+        {
+            m_PivotPositionOffset = Vector3.zero;
+            m_ZoomFactor = m_AvatarScale;
+            evt.Use();
+        }
+        if (type == EventType.KeyDown && Event.current.keyCode == KeyCode.G)
+        {
+            m_PivotPositionOffset = GetCurrentMouseWorldPosition(evt, previewRect) - bodyPosition;
+            evt.Use();
+        }
+    }
+
+    protected Vector3 GetCurrentMouseWorldPosition(Event evt, Rect previewRect)
+    {
+        Camera camera = m_PreviewUtility.m_Camera;
+        float scaleFactor = m_PreviewUtility.GetScaleFactor(previewRect.width, previewRect.height);
+        return camera.ScreenToWorldPoint(new Vector3((evt.mousePosition.x - previewRect.x) * scaleFactor, (previewRect.height - (evt.mousePosition.y - previewRect.y)) * scaleFactor, 0f)
+        {
+            z = Vector3.Distance(bodyPosition, camera.transform.position)
+        });
+    }
+
+    public void DoAvatarPreviewZoom(Event evt, float delta)
+    {
+        float num = -delta * 0.05f;
+        m_ZoomFactor += m_ZoomFactor * num;
+        m_ZoomFactor = Mathf.Max(m_ZoomFactor, m_AvatarScale / 10f);
+        evt.Use();
+    }
+
     public static Vector2 Drag2D(Vector2 scrollPosition, Rect position)
     {
         int controlID = GUIUtility.GetControlID("Slider".GetHashCode(), FocusType.Passive);
@@ -339,4 +666,5 @@ public class ParticleSystemPreview : ObjectPreview
         }
         return selected;
     }
+
 }
