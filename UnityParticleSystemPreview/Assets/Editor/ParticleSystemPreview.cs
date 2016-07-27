@@ -8,15 +8,15 @@ public class ParticleSystemPreview : ObjectPreview
 {
     private class Styles
     {
-		public GUIContent speedScale = EditorGUIUtility.IconContent("SpeedScale", "Changes animation preview speed");
-        public GUIContent pivot = EditorGUIUtility.IconContent("AvatarPivot", "Displays avatar's pivot and mass center");
+		public GUIContent speedScale = IconContent("SpeedScale", "Changes particle preview speed");
+        public GUIContent pivot = IconContent("AvatarPivot", "Displays avatar's pivot and mass center");
         public GUIContent[] play = new GUIContent[2]
         {
-            EditorGUIUtility.IconContent("preAudioPlayOff", "Play"),
-            EditorGUIUtility.IconContent("preAudioPlayOn", "Stop")
+            IconContent("preAudioPlayOff", "Play"),
+            IconContent("preAudioPlayOn", "Stop")
         };
-        public GUIContent lockParticleSystem = EditorGUIUtility.IconContent("IN LockButton", "Lock the current selected Particle System");
-		public GUIContent reload = new GUIContent("Reload", "Reload preview");
+        public GUIContent lockParticleSystem = IconContent("IN LockButton", "Lock the current particle");
+		public GUIContent reload = new GUIContent("Reload", "Reload particle preview");
         public GUIStyle preButton = "preButton";
         public GUIStyle preSlider = "preSlider";
         public GUIStyle preSliderThumb = "preSliderThumb";
@@ -136,11 +136,6 @@ public class ParticleSystemPreview : ObjectPreview
 
     public override void Initialize(UnityEngine.Object[] targets)
     {
-        if (prevPreview != null)
-        {
-            prevPreview.OnDestroy();
-        }
-        prevPreview = this;
         if (s_Styles == null)
         {
             s_Styles = new Styles();
@@ -268,6 +263,12 @@ public class ParticleSystemPreview : ObjectPreview
             return;
         }
         m_Loaded = true;
+
+        if (prevPreview != null)
+        {
+            prevPreview.OnDestroy();
+        }
+        prevPreview = this;
         if (m_PreviewUtility == null)
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
@@ -849,4 +850,11 @@ public class ParticleSystemPreview : ObjectPreview
         return selected;
     }
 
+
+    private static GUIContent IconContent(string name, string tooltip)
+    {
+        GUIContent content = EditorGUIUtility.IconContent(name, tooltip);
+        content.tooltip = tooltip;
+        return content;
+    }
 }
