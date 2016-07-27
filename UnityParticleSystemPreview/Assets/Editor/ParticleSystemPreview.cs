@@ -15,17 +15,31 @@ public class ParticleSystemPreview : ObjectPreview
             EditorGUIUtility.IconContent("preAudioPlayOff", "Play"),
             EditorGUIUtility.IconContent("preAudioPlayOn", "Stop")
         };
+        public GUIContent lockParticleSystem = EditorGUIUtility.IconContent("IN LockButton", "Lock the current selected Particle System");
+		public GUIContent reload = new GUIContent("Reload", "Reload preview");
         public GUIStyle preButton = "preButton";
         public GUIStyle preSlider = "preSlider";
         public GUIStyle preSliderThumb = "preSliderThumb";
         public GUIStyle preLabel = "preLabel";
     }
 
+    /// <summary>
+    /// 视图工具
+    /// </summary>
     protected enum ViewTool
     {
         None,
+        /// <summary>
+        /// 平移
+        /// </summary>
         Pan,
+        /// <summary>
+        /// 缩放
+        /// </summary>
         Zoom,
+        /// <summary>
+        /// 旋转
+        /// </summary>
         Orbit
     }
 
@@ -50,14 +64,16 @@ public class ParticleSystemPreview : ObjectPreview
     private float m_BoundingVolumeScale;
     protected ViewTool m_ViewTool;
     private bool m_ShowReference;
+    private bool m_Loaded;
     private int m_PreviewHint = "Preview".GetHashCode();
     private int m_PreviewSceneHint = "PreviewSene".GetHashCode();
-    public float m_PlaybackSpeed = 1f;
 
     private bool m_Playing;
     private float m_RunningTime;
     private double m_PreviousTime;
-    private const float kDuration = 30f;
+    private float m_PlaybackSpeed = 1f;
+    private bool m_LockParticleSystem;
+    private const float kDuration = 99f;
     private static int PreviewCullingLayer = 31;
     private static Styles s_Styles;
     private static ParticleSystemPreview prevPreview;
@@ -131,10 +147,127 @@ public class ParticleSystemPreview : ObjectPreview
         }
 
         base.Initialize(targets);
-        if (!HasPreviewGUI())
+    }
+
+    public override bool HasPreviewGUI()
+    {
+        return EditorUtility.IsPersistent(target) && HasStaticPreview();
+    }
+
+    public override void OnPreviewGUI(Rect r, GUIStyle background)
+    {
+        InitPreview();
+        if (m_PreviewUtility == null)
         {
             return;
         }
+
+        Rect rect2 = r;
+        int controlID = GUIUtility.GetControlID(m_PreviewHint, FocusType.Native, rect2);
+        Event current = Event.current;
+        EventType typeForControl = current.GetTypeForControl(controlID);
+
+        if (typeForControl == EventType.Repaint)
+        {
+            m_PreviewUtility.BeginPreview(rect2, background);
+            DoRenderPreview();
+            m_PreviewUtility.EndAndDrawPreview(rect2);
+        }
+
+        int controlID2 = GUIUtility.GetControlID(m_PreviewSceneHint, FocusType.Native);
+        typeForControl = current.GetTypeForControl(controlID2);
+        HandleViewTool(current, typeForControl, controlID2, rect2);
+        DoAvatarPreviewFrame(current, typeForControl, rect2);
+        EditorGUI.DropShadowLabel(new Rect(r.x, r.yMax - 20f, r.width, 20f), "Playback Time:" + String.Format("{0:F}", m_RunningTime));
+
+        if (current.type == EventType.Repaint)
+        {
+            EditorGUIUtility.AddCursorRect(rect2, currentCursor);
+        }
+    }
+
+    public override GUIContent GetPreviewTitle()
+    {
+        GUIContent content = base.GetPreviewTitle();
+        content.text = "Particle Preview";
+        return content;
+    }
+
+    public override void OnPreviewSettings()
+    {
+        InitPreview();
+        if (m_PreviewUtility == null)
+        {
+            if (GUILayout.Button(s_Styles.reload, s_Styles.preButton))
+            {
+                m_Loaded = false;
+            }
+            return;
+        }
+
+        EditorGUI.BeginChangeCheck();
+        m_ShowReference = GUILayout.Toggle(m_ShowReference, s_Styles.pivot, s_Styles.preButton);
+        if (EditorGUI.EndChangeCheck())
+        {
+            EditorPrefs.SetBool("AvatarpreviewShowReference", m_ShowReference);
+        }
+
+        EditorGUI.BeginChangeCheck();
+        m_LockParticleSystem = GUILayout.Toggle(m_LockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
+        if (EditorGUI.EndChangeCheck())
+        {
+            SetSimulateMode();
+        }
+
+        bool flag = CycleButton(!m_Playing ? 0 : 1, s_Styles.play, s_Styles.preButton) != 0;
+        if (flag != m_Playing)
+        {
+            if (flag)
+            {
+                SimulateEnable();
+            }
+            else
+            {
+                SimulateDisable();
+            }
+        }
+
+        GUILayout.Box(s_Styles.speedScale, s_Styles.preLabel);
+        EditorGUI.BeginChangeCheck();
+        m_PlaybackSpeed = PreviewSlider(m_PlaybackSpeed, 0.03f);
+        if (EditorGUI.EndChangeCheck() && m_PreviewInstance)
+        {
+            ParticleSystem[] particleSystems = m_PreviewInstance.GetComponentsInChildren<ParticleSystem>(true);
+            foreach (var particleSystem in particleSystems)
+            {
+                particleSystem.playbackSpeed = m_PlaybackSpeed;
+            }
+        }
+        GUILayout.Label(m_PlaybackSpeed.ToString("f2"), s_Styles.preLabel);
+    }
+
+    public override void ReloadPreviewInstances()
+    {
+        Debug.Log("reload");
+        if (m_PreviewUtility == null)
+        {
+            return;
+        }
+        CreatePreviewInstances();
+    }
+
+    public override string GetInfoString()
+    {
+        return " ";
+    }
+
+    private void InitPreview()
+    {
+        if (m_Loaded)
+        {
+            return;
+        }
+        m_Loaded = true;
         if (m_PreviewUtility == null)
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
@@ -186,95 +319,6 @@ public class ParticleSystemPreview : ObjectPreview
         }
         m_ShowReference = EditorPrefs.GetBool("AvatarpreviewShowReference", true);
         SetPreviewCharacterEnabled(false, false);
-    }
-
-    public override bool HasPreviewGUI()
-    {
-        return EditorUtility.IsPersistent(target) && HasStaticPreview();
-    }
-
-    public override void OnPreviewGUI(Rect r, GUIStyle background)
-    {
-        if (m_PreviewUtility == null)
-        {
-            return;
-        }
-
-        Rect rect2 = r;
-        int controlID = GUIUtility.GetControlID(m_PreviewHint, FocusType.Native, rect2);
-        Event current = Event.current;
-        EventType typeForControl = current.GetTypeForControl(controlID);
-
-        if (typeForControl == EventType.Repaint)
-        {
-            m_PreviewUtility.BeginPreview(rect2, background);
-            DoRenderPreview();
-            m_PreviewUtility.EndAndDrawPreview(rect2);
-        }
-
-        int controlID2 = GUIUtility.GetControlID(m_PreviewSceneHint, FocusType.Native);
-        typeForControl = current.GetTypeForControl(controlID2);
-        HandleViewTool(current, typeForControl, controlID2, rect2);
-        DoAvatarPreviewFrame(current, typeForControl, rect2);
-        EditorGUI.DropShadowLabel(new Rect(r.x, r.yMax - 20f, r.width, 20f), "Playback Time:" + String.Format("{0:F}", m_RunningTime));
-
-        if (current.type == EventType.Repaint)
-        {
-            EditorGUIUtility.AddCursorRect(rect2, currentCursor);
-        }
-    }
-
-    public override GUIContent GetPreviewTitle()
-    {
-        GUIContent content = base.GetPreviewTitle();
-        content.text += " Particle Preview";
-        return content;
-    }
-
-    public override void OnPreviewSettings()
-    {
-        if (m_PreviewUtility == null)
-        {
-            return;
-        }
-
-        EditorGUI.BeginChangeCheck();
-        m_ShowReference = GUILayout.Toggle(m_ShowReference, s_Styles.pivot, s_Styles.preButton);
-        if (EditorGUI.EndChangeCheck())
-        {
-            EditorPrefs.SetBool("AvatarpreviewShowReference", m_ShowReference);
-        }
-
-        bool flag = CycleButton(!m_Playing ? 0 : 1, s_Styles.play, s_Styles.preButton) != 0;
-        if (flag != m_Playing)
-        {
-            if (flag)
-            {
-                SimulateEnable();
-            }
-            else
-            {
-                SimulateDisable();
-            }
-        }
-
-        GUILayout.Box(s_Styles.speedScale, s_Styles.preLabel);
-        EditorGUI.BeginChangeCheck();
-        m_PlaybackSpeed = PreviewSlider(m_PlaybackSpeed, 0.03f);
-        if (EditorGUI.EndChangeCheck())
-        {
-        }
-        GUILayout.Label(m_PlaybackSpeed.ToString("f2"), s_Styles.preLabel);
-    }
-
-    public override void ReloadPreviewInstances()
-    {
-        Debug.Log("reload");
-        if (m_PreviewUtility == null)
-        {
-            return;
-        }
-        CreatePreviewInstances();
     }
 
     private bool HasStaticPreview()
@@ -413,9 +457,14 @@ public class ParticleSystemPreview : ObjectPreview
         m_RootInstance.transform.localScale = Vector3.one * scale * 0.25f;
     }
 
+    /// <summary>
+    /// 最后的销毁方法
+    /// 不能被Unity自动调用，目前只能在点下一个对象时，调用销毁
+    /// </summary>
     public void OnDestroy()
     {
         Debug.Log("ParticleSystemPreview OnDestroy()");
+        ClearLockedParticle();
         SimulateDisable();
         DestroyPreviewInstances();
         if (m_PreviewUtility != null)
@@ -425,8 +474,20 @@ public class ParticleSystemPreview : ObjectPreview
         }
     }
 
+    /// <summary>
+    /// 模拟-开启
+    /// </summary>
     private void SimulateEnable()
     {
+        if (m_LockParticleSystem)
+        {
+            ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
+            if (particleSystem)
+            {
+                particleSystem.Play();
+                ParticleSystemEditorUtilsReflect.editorIsScrubbing = false;
+            }
+        }
         m_PreviousTime = EditorApplication.timeSinceStartup;
 
         EditorApplication.update -= InspectorUpdate;
@@ -435,21 +496,41 @@ public class ParticleSystemPreview : ObjectPreview
         m_Playing = true;
     }
 
+    /// <summary>
+    /// 模拟-停止
+    /// </summary>
     private void SimulateDisable()
     {
+        if (m_LockParticleSystem)
+        {
+            ParticleSystemEditorUtilsReflect.editorIsScrubbing = false;
+            ParticleSystemEditorUtilsReflect.editorPlaybackTime = 0f;
+            ParticleSystemEditorUtilsReflect.StopEffect();
+        }
         EditorApplication.update -= InspectorUpdate;
         m_RunningTime = 0f;
         m_Playing = false;
     }
 
+    /// <summary>
+    /// 模拟-更新方法
+    /// 锁定粒子方式的话，只需要刷新编辑器即可
+    /// </summary>
     private void SimulateUpdate()
     {
+        if (m_LockParticleSystem)
+        {
+            InspectorWindowUtil.Init();
+            InspectorWindowUtil.repaintAllInspectors();
+            return;
+        }
+
         GameObject gameObject = m_PreviewInstance;
         ParticleSystem particleSystem = gameObject.GetComponentInChildren<ParticleSystem>(true);
         if (particleSystem)
         {
-            particleSystem.playbackSpeed = m_PlaybackSpeed;
             particleSystem.Simulate(m_RunningTime, true);
+
             InspectorWindowUtil.Init();
             InspectorWindowUtil.repaintAllInspectors();
         }
@@ -464,6 +545,49 @@ public class ParticleSystemPreview : ObjectPreview
         {
             m_RunningTime = Mathf.Clamp(m_RunningTime + (float)delta, 0f, kDuration);
             SimulateUpdate();
+        }
+    }
+
+    /// <summary>
+    /// 设置模拟方式
+    /// 一种直接调用Simulate方法，效果跟直接运行播放不一定一样
+    /// 一种调用锁定粒子，再调用play方法，效果跟直接运行播放一样
+    /// </summary>
+    private void SetSimulateMode()
+    {
+        SimulateDisable();
+        if (m_PreviewInstance)
+        {
+            ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
+            if (particleSystem)
+            {
+                if (m_LockParticleSystem)
+                {
+                    ParticleSystemEditorUtilsReflect.lockedParticleSystem = particleSystem;
+                }
+                else
+                {
+                    ParticleSystemEditorUtilsReflect.lockedParticleSystem = null;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 解锁粒子
+    /// </summary>
+    private void ClearLockedParticle()
+    {
+        if (m_PreviewInstance)
+        {
+            ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
+            if (particleSystem)
+            {
+                if (m_LockParticleSystem && ParticleSystemEditorUtilsReflect.lockedParticleSystem == particleSystem)
+                {
+                    ParticleSystemEditorUtilsReflect.lockedParticleSystem = null;
+                }
+            }
         }
     }
 
@@ -551,6 +675,14 @@ public class ParticleSystemPreview : ObjectPreview
         evt.Use();
     }
 
+    /// <summary>
+    /// 定位事件
+    /// 按F近距离查看对象
+    /// 按G视图平移到鼠标位置
+    /// </summary>
+    /// <param name="evt"></param>
+    /// <param name="type"></param>
+    /// <param name="previewRect"></param>
     public void DoAvatarPreviewFrame(Event evt, EventType type, Rect previewRect)
     {
         if (type == EventType.KeyDown && evt.keyCode == KeyCode.F)
