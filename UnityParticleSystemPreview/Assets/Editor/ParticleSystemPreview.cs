@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -73,10 +74,12 @@ public class ParticleSystemPreview : ObjectPreview
     private double m_PreviousTime;
     private float m_PlaybackSpeed = 1f;
     private bool m_LockParticleSystem;
+    private Editor m_CacheObject;
     private const float kDuration = 99f;
     private static int PreviewCullingLayer = 31;
     private static Styles s_Styles;
     private static ParticleSystemPreview prevPreview;
+    private static List<ParticleSystemPreview> cachePreviews = new List<ParticleSystemPreview>();
 
     public Vector3 bodyPosition
     {
@@ -142,6 +145,59 @@ public class ParticleSystemPreview : ObjectPreview
         }
 
         base.Initialize(targets);
+
+        var editors = ActiveEditorTracker.sharedTracker.activeEditors;
+        foreach (var editor in editors)
+        {
+            if (editor.target == target)
+            {
+                for (int i = cachePreviews.Count - 1; i >= 0; i--)
+                {
+                    ParticleSystemPreview preview = cachePreviews[i];
+                    if (preview == null || preview.m_CacheObject == editor)
+                    {
+                        if (preview != null)
+                        {
+                            preview.OnDestroy();
+                        }
+                        cachePreviews.RemoveAt(i);
+                    }
+                }
+                m_CacheObject = editor;
+                break;
+            }
+        }
+
+        for (int i = cachePreviews.Count - 1; i >= 0; i--)
+        {
+            ParticleSystemPreview preview = cachePreviews[i];
+            if (preview == null)
+            {
+                cachePreviews.RemoveAt(i);
+            }
+            else if (preview.m_CacheObject == null)
+            {
+                preview.OnDestroy();
+                cachePreviews.RemoveAt(i);
+            }
+            else
+            {
+                int j = 0;
+                for (j = 0; j < editors.Length; j++)
+                {
+                    if (editors[j] == m_CacheObject)
+                    {
+                        break;
+                    }
+                }
+                if (j == editors.Length)
+                {
+                    preview.OnDestroy();
+                    cachePreviews.RemoveAt(i);
+                }
+            }
+        }
+        cachePreviews.Add(this);
     }
 
     public override bool HasPreviewGUI()
@@ -263,12 +319,7 @@ public class ParticleSystemPreview : ObjectPreview
             return;
         }
         m_Loaded = true;
-
-        if (prevPreview != null)
-        {
-            prevPreview.OnDestroy();
-        }
-        prevPreview = this;
+        
         if (m_PreviewUtility == null)
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
@@ -372,7 +423,6 @@ public class ParticleSystemPreview : ObjectPreview
 
     private void CreatePreviewInstances()
     {
-        Debug.Log("ParticleSystemPreview CreatePreviewInstances()");
         DestroyPreviewInstances();
         GameObject gameObject = UnityEngine.Object.Instantiate(target) as GameObject;
         InitInstantiatedPreviewRecursive(gameObject);
@@ -385,6 +435,7 @@ public class ParticleSystemPreview : ObjectPreview
             component.fireEvents = false;
         }
         m_PreviewInstance = gameObject;
+        Debug.Log("OnCreate");
 
         Bounds bounds = new Bounds(m_PreviewInstance.transform.position, Vector3.zero);
         GetRenderableBoundsRecurse(ref bounds, m_PreviewInstance);
@@ -464,12 +515,12 @@ public class ParticleSystemPreview : ObjectPreview
     /// </summary>
     public void OnDestroy()
     {
-        Debug.Log("ParticleSystemPreview OnDestroy()");
         ClearLockedParticle();
         SimulateDisable();
         DestroyPreviewInstances();
         if (m_PreviewUtility != null)
         {
+            Debug.Log("OnDestroy");
             m_PreviewUtility.Cleanup();
             m_PreviewUtility = null;
         }
