@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
-using UnityEngine;
 
-[CustomPreview(typeof(GameObject))]
+// Disable it
+//[CustomPreview(typeof(GameObject))]
 public class ParticleSystemPreview : ObjectPreview
 {
     private class Styles
@@ -74,12 +74,11 @@ public class ParticleSystemPreview : ObjectPreview
     private double m_PreviousTime;
     private float m_PlaybackSpeed = 1f;
     private bool m_LockParticleSystem;
-    private Editor m_CacheObject;
+    private bool m_HasPreview;
+    private Editor m_CacheEditor;
     private const float kDuration = 99f;
     private static int PreviewCullingLayer = 31;
     private static Styles s_Styles;
-    private static ParticleSystemPreview prevPreview;
-    private static List<ParticleSystemPreview> cachePreviews = new List<ParticleSystemPreview>();
 
     public Vector3 bodyPosition
     {
@@ -137,6 +136,11 @@ public class ParticleSystemPreview : ObjectPreview
         }
     }
 
+    public void SetEditor(Editor editor)
+    {
+        m_CacheEditor = editor;
+    }
+
     public override void Initialize(UnityEngine.Object[] targets)
     {
         if (s_Styles == null)
@@ -146,63 +150,33 @@ public class ParticleSystemPreview : ObjectPreview
 
         base.Initialize(targets);
 
-        var editors = ActiveEditorTracker.sharedTracker.activeEditors;
-        foreach (var editor in editors)
+        if (m_CacheEditor == null)
         {
-            if (editor.target == target)
+            var editors = ActiveEditorTracker.sharedTracker.activeEditors;
+            foreach (var editor in editors)
             {
-                for (int i = cachePreviews.Count - 1; i >= 0; i--)
+                if (editor.target == target)
                 {
-                    ParticleSystemPreview preview = cachePreviews[i];
-                    if (preview == null || preview.m_CacheObject == editor)
-                    {
-                        if (preview != null)
-                        {
-                            preview.OnDestroy();
-                        }
-                        cachePreviews.RemoveAt(i);
-                    }
+                    m_CacheEditor = editor;
+                    break;
                 }
-                m_CacheObject = editor;
-                break;
+            }
+            if (m_CacheEditor == null && editors.Length > 0)
+            {
+                m_CacheEditor = editors[0];
             }
         }
 
-        for (int i = cachePreviews.Count - 1; i >= 0; i--)
+        m_HasPreview = EditorUtility.IsPersistent(target) && HasStaticPreview();
+        if (m_Targets.Length != 1)
         {
-            ParticleSystemPreview preview = cachePreviews[i];
-            if (preview == null)
-            {
-                cachePreviews.RemoveAt(i);
-            }
-            else if (preview.m_CacheObject == null)
-            {
-                preview.OnDestroy();
-                cachePreviews.RemoveAt(i);
-            }
-            else
-            {
-                int j = 0;
-                for (j = 0; j < editors.Length; j++)
-                {
-                    if (editors[j] == m_CacheObject)
-                    {
-                        break;
-                    }
-                }
-                if (j == editors.Length)
-                {
-                    preview.OnDestroy();
-                    cachePreviews.RemoveAt(i);
-                }
-            }
+            m_HasPreview = false;
         }
-        cachePreviews.Add(this);
     }
 
     public override bool HasPreviewGUI()
     {
-        return EditorUtility.IsPersistent(target) && HasStaticPreview();
+        return m_HasPreview;
     }
 
     public override void OnPreviewGUI(Rect r, GUIStyle background)
@@ -319,7 +293,7 @@ public class ParticleSystemPreview : ObjectPreview
             return;
         }
         m_Loaded = true;
-        
+
         if (m_PreviewUtility == null)
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
@@ -572,8 +546,7 @@ public class ParticleSystemPreview : ObjectPreview
     {
         if (m_LockParticleSystem)
         {
-            InspectorWindowUtil.Init();
-            InspectorWindowUtil.repaintAllInspectors();
+            Repaint();
             return;
         }
 
@@ -582,9 +555,7 @@ public class ParticleSystemPreview : ObjectPreview
         if (particleSystem)
         {
             particleSystem.Simulate(m_RunningTime, true);
-
-            InspectorWindowUtil.Init();
-            InspectorWindowUtil.repaintAllInspectors();
+            Repaint();
         }
     }
 
@@ -622,6 +593,14 @@ public class ParticleSystemPreview : ObjectPreview
                     ParticleSystemEditorUtilsReflect.lockedParticleSystem = null;
                 }
             }
+        }
+    }
+
+    private void Repaint()
+    {
+        if (m_CacheEditor)
+        {
+            m_CacheEditor.Repaint();
         }
     }
 
@@ -900,7 +879,6 @@ public class ParticleSystemPreview : ObjectPreview
         }
         return selected;
     }
-
 
     private static GUIContent IconContent(string name, string tooltip)
     {
