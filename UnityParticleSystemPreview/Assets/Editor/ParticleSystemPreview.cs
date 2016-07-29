@@ -409,7 +409,7 @@ public class ParticleSystemPreview : ObjectPreview
             component.fireEvents = false;
         }
         m_PreviewInstance = gameObject;
-        Debug.Log("OnCreate");
+        //Debug.Log("OnCreate");
 
         Bounds bounds = new Bounds(m_PreviewInstance.transform.position, Vector3.zero);
         GetRenderableBoundsRecurse(ref bounds, m_PreviewInstance);
@@ -494,7 +494,7 @@ public class ParticleSystemPreview : ObjectPreview
         DestroyPreviewInstances();
         if (m_PreviewUtility != null)
         {
-            Debug.Log("OnDestroy");
+            //Debug.Log("OnDestroy");
             m_PreviewUtility.Cleanup();
             m_PreviewUtility = null;
         }
@@ -505,6 +505,7 @@ public class ParticleSystemPreview : ObjectPreview
     /// </summary>
     private void SimulateEnable()
     {
+        SimulateDisable();
         if (m_LockParticleSystem)
         {
             ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);

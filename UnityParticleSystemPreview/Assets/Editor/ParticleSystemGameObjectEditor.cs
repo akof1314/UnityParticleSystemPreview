@@ -4,7 +4,19 @@ using UnityEditor;
 [CustomEditor(typeof(GameObject)), CanEditMultipleObjects]
 public class ParticleSystemGameObjectEditor : OverrideEditor
 {
+    private class Styles
+    {
+        public GUIContent ps = new GUIContent("PS", "Show particle system preview");
+        public GUIStyle preButton = "preButton";
+    }
+
+    private bool m_ShowParticlePreview;
+
+    private int m_DefaultHasPreview;
+
     private ParticleSystemPreview m_Preview;
+
+    private static Styles s_Styles;
 
     private ParticleSystemPreview preview
     {
@@ -27,9 +39,10 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
         CreateCachedEditor(targets, baseType, ref editor);
         return editor;
     }
-    
+
     void OnEnable()
     {
+        m_ShowParticlePreview = true;
     }
 
     void OnDisable()
@@ -43,19 +56,33 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
         return preview.HasPreviewGUI();
     }
 
+    private bool HasBasePreview()
+    {
+        if (m_DefaultHasPreview == 0)
+        {
+            m_DefaultHasPreview = baseEditor.HasPreviewGUI() ? 1 : -1;
+        }
+        return m_DefaultHasPreview == 1;
+    }
+
+    private bool IsShowParticleSystemPreview()
+    {
+        return HasParticleSystemPreview() && m_ShowParticlePreview;
+    }
+
     public override bool HasPreviewGUI()
     {
-        return HasParticleSystemPreview() || baseEditor.HasPreviewGUI();
+        return HasParticleSystemPreview() || HasBasePreview();
     }
 
     public override GUIContent GetPreviewTitle()
     {
-        return HasParticleSystemPreview() ? preview.GetPreviewTitle() : baseEditor.GetPreviewTitle();
+        return IsShowParticleSystemPreview() ? preview.GetPreviewTitle() : baseEditor.GetPreviewTitle();
     }
 
     public override void OnPreviewGUI(Rect r, GUIStyle background)
     {
-        if (HasParticleSystemPreview())
+        if (IsShowParticleSystemPreview())
         {
             preview.OnPreviewGUI(r, background);
         }
@@ -67,7 +94,7 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
 
     public override void OnInteractivePreviewGUI(Rect r, GUIStyle background)
     {
-        if (HasParticleSystemPreview())
+        if (IsShowParticleSystemPreview())
         {
             preview.OnInteractivePreviewGUI(r, background);
         }
@@ -79,7 +106,15 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
 
     public override void OnPreviewSettings()
     {
-        if (HasParticleSystemPreview())
+        if (s_Styles == null)
+        {
+            s_Styles = new Styles();
+        }
+        if (HasBasePreview() && HasParticleSystemPreview())
+        {
+            m_ShowParticlePreview = GUILayout.Toggle(m_ShowParticlePreview, s_Styles.ps, s_Styles.preButton);
+        }
+        if (IsShowParticleSystemPreview())
         {
             preview.OnPreviewSettings();
         }
@@ -91,12 +126,12 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
 
     public override string GetInfoString()
     {
-        return HasParticleSystemPreview() ? preview.GetInfoString() : baseEditor.GetInfoString();
+        return IsShowParticleSystemPreview() ? preview.GetInfoString() : baseEditor.GetInfoString();
     }
 
     public override void ReloadPreviewInstances()
     {
-        if (HasParticleSystemPreview())
+        if (IsShowParticleSystemPreview())
         {
             preview.ReloadPreviewInstances();
         }
