@@ -203,7 +203,8 @@ public class ParticleSystemPreview : ObjectPreview
         typeForControl = current.GetTypeForControl(controlID2);
         HandleViewTool(current, typeForControl, controlID2, rect2);
         DoAvatarPreviewFrame(current, typeForControl, rect2);
-        EditorGUI.DropShadowLabel(new Rect(r.x, r.yMax - 20f, r.width, 20f), "Playback Time:" + String.Format("{0:F}", m_RunningTime));
+        EditorGUI.DropShadowLabel(new Rect(r.x, r.yMax - 20f, r.width, 20f), 
+            (r.width > 140f ? "Playback Time:" : string.Empty) + String.Format("{0:F}", m_RunningTime));
 
         if (current.type == EventType.Repaint)
         {
@@ -599,6 +600,13 @@ public class ParticleSystemPreview : ObjectPreview
 
     private void Repaint()
     {
+        /* 如果有使用 https://github.com/akof1314/ObjectPickerAdvanced
+        EditorWindow ew = EditorWindow.focusedWindow;
+        if (ew && ew as ObjectSelectorWindow)
+        {
+            ew.Repaint();
+            return;
+        }*/
         if (m_CacheEditor)
         {
             m_CacheEditor.Repaint();
