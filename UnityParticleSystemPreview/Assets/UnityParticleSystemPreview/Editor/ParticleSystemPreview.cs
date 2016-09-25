@@ -73,7 +73,7 @@ public class ParticleSystemPreview : ObjectPreview
     private float m_RunningTime;
     private double m_PreviousTime;
     private float m_PlaybackSpeed = 1f;
-    private bool m_LockParticleSystem;
+    private bool m_LockParticleSystem = true;
     private bool m_HasPreview;
     private Editor m_CacheEditor;
     private const float kDuration = 99f;
@@ -238,12 +238,12 @@ public class ParticleSystemPreview : ObjectPreview
             EditorPrefs.SetBool("AvatarpreviewShowReference", m_ShowReference);
         }
 
-        EditorGUI.BeginChangeCheck();
-        m_LockParticleSystem = GUILayout.Toggle(m_LockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
-        if (EditorGUI.EndChangeCheck())
-        {
-            SetSimulateMode();
-        }
+        //EditorGUI.BeginChangeCheck();
+        //m_LockParticleSystem = GUILayout.Toggle(m_LockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
+        //if (EditorGUI.EndChangeCheck())
+        //{
+        //    SetSimulateMode();
+        //}
 
         bool flag = CycleButton(!m_Playing ? 0 : 1, s_Styles.play, s_Styles.preButton) != 0;
         if (flag != m_Playing)
@@ -507,6 +507,7 @@ public class ParticleSystemPreview : ObjectPreview
     private void SimulateEnable()
     {
         SimulateDisable();
+        SetSimulateMode();
         if (m_LockParticleSystem)
         {
             ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
@@ -588,7 +589,10 @@ public class ParticleSystemPreview : ObjectPreview
             {
                 if (m_LockParticleSystem)
                 {
-                    ParticleSystemEditorUtilsReflect.lockedParticleSystem = particleSystem;
+                    if (ParticleSystemEditorUtilsReflect.lockedParticleSystem != particleSystem)
+                    {
+                        ParticleSystemEditorUtilsReflect.lockedParticleSystem = particleSystem;
+                    }
                 }
                 else
                 {
