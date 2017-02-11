@@ -35,7 +35,7 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
     protected override Editor GetBaseEditor()
     {
         Editor editor = null;
-        var baseType = Types.GetType("UnityEditor.GameObjectInspector", "UnityEditor.dll");
+        var baseType = typeof(Editor).Assembly.GetType("UnityEditor.GameObjectInspector");
         CreateCachedEditor(targets, baseType, ref editor);
         return editor;
     }

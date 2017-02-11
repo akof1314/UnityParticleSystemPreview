@@ -188,7 +188,7 @@ public class ParticleSystemPreview : ObjectPreview
         }
 
         Rect rect2 = r;
-        int controlID = GUIUtility.GetControlID(m_PreviewHint, FocusType.Native, rect2);
+        int controlID = GUIUtility.GetControlID(m_PreviewHint, FocusType.Passive, rect2);
         Event current = Event.current;
         EventType typeForControl = current.GetTypeForControl(controlID);
 
@@ -199,7 +199,7 @@ public class ParticleSystemPreview : ObjectPreview
             m_PreviewUtility.EndAndDrawPreview(rect2);
         }
 
-        int controlID2 = GUIUtility.GetControlID(m_PreviewSceneHint, FocusType.Native);
+        int controlID2 = GUIUtility.GetControlID(m_PreviewSceneHint, FocusType.Passive);
         typeForControl = current.GetTypeForControl(controlID2);
         HandleViewTool(current, typeForControl, controlID2, rect2);
         DoAvatarPreviewFrame(current, typeForControl, rect2);
@@ -266,7 +266,12 @@ public class ParticleSystemPreview : ObjectPreview
             ParticleSystem[] particleSystems = m_PreviewInstance.GetComponentsInChildren<ParticleSystem>(true);
             foreach (var particleSystem in particleSystems)
             {
+#if UNITY_5_5_OR_NEWER
+                ParticleSystem.MainModule main = particleSystem.main;
+                main.simulationSpeed = m_PlaybackSpeed;
+#else
                 particleSystem.playbackSpeed = m_PlaybackSpeed;
+#endif
             }
         }
         GUILayout.Label(m_PlaybackSpeed.ToString("f2"), s_Styles.preLabel);
