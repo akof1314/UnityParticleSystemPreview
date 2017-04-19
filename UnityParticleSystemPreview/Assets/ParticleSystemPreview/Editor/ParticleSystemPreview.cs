@@ -143,11 +143,6 @@ public class ParticleSystemPreview : ObjectPreview
 
     public override void Initialize(UnityEngine.Object[] targets)
     {
-        if (s_Styles == null)
-        {
-            s_Styles = new Styles();
-        }
-
         base.Initialize(targets);
 
         if (m_CacheEditor == null)
@@ -221,6 +216,11 @@ public class ParticleSystemPreview : ObjectPreview
 
     public override void OnPreviewSettings()
     {
+        if (s_Styles == null)
+        {
+            s_Styles = new Styles();
+        }
+
         InitPreview();
         if (m_PreviewUtility == null)
         {
