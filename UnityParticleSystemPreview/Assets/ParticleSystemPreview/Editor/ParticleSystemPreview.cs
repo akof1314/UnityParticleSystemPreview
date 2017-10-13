@@ -552,19 +552,11 @@ public class ParticleSystemPreview : ObjectPreview
     /// </summary>
     private void SimulateUpdate()
     {
-        if (m_LockParticleSystem)
-        {
-            Repaint();
-            return;
-        }
-
-        GameObject gameObject = m_PreviewInstance;
-        ParticleSystem particleSystem = gameObject.GetComponentInChildren<ParticleSystem>(true);
-        if (particleSystem)
+        foreach(var particleSystem in m_PreviewInstance.GetComponentsInChildren<ParticleSystem>(false))
         {
             particleSystem.Simulate(m_RunningTime, true);
-            Repaint();
         }
+        Repaint();
     }
 
     private void InspectorUpdate()
