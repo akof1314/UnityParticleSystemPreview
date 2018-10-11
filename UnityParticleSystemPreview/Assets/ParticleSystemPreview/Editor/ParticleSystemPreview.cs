@@ -303,8 +303,16 @@ public class ParticleSystemPreview : ObjectPreview
         if (m_PreviewUtility == null)
         {
             m_PreviewUtility = new PreviewRenderUtility(true);
+#if UNITY_2017_1_OR_NEWER
+            m_PreviewUtility.cameraFieldOfView = 30f;
+#else
             m_PreviewUtility.m_CameraFieldOfView = 30f;
-            m_PreviewUtility.m_Camera.cullingMask = 1 << PreviewCullingLayer;
+#endif
+            GetPreviewCamera().cullingMask = 1 << PreviewCullingLayer;
+#if UNITY_5_6_OR_NEWER
+            GetPreviewCamera().allowHDR = false;
+            GetPreviewCamera().allowMSAA = false;
+#endif
             CreatePreviewInstances();
         }
         if (m_FloorPlane == null)
@@ -330,24 +338,28 @@ public class ParticleSystemPreview : ObjectPreview
             GameObject original = (GameObject)EditorGUIUtility.Load("Avatar/dial_flat.prefab");
             m_ReferenceInstance = (GameObject)UnityEngine.Object.Instantiate(original, Vector3.zero, Quaternion.identity);
             InitInstantiatedPreviewRecursive(m_ReferenceInstance);
+            AddSingleGO(m_ReferenceInstance);
         }
         if (m_DirectionInstance == null)
         {
             GameObject original2 = (GameObject)EditorGUIUtility.Load("Avatar/arrow.fbx");
             m_DirectionInstance = (GameObject)UnityEngine.Object.Instantiate(original2, Vector3.zero, Quaternion.identity);
             InitInstantiatedPreviewRecursive(m_DirectionInstance);
+            AddSingleGO(m_DirectionInstance);
         }
         if (m_PivotInstance == null)
         {
             GameObject original3 = (GameObject)EditorGUIUtility.Load("Avatar/root.fbx");
             m_PivotInstance = (GameObject)UnityEngine.Object.Instantiate(original3, Vector3.zero, Quaternion.identity);
             InitInstantiatedPreviewRecursive(m_PivotInstance);
+            AddSingleGO(m_PivotInstance);
         }
         if (m_RootInstance == null)
         {
             GameObject original4 = (GameObject)EditorGUIUtility.Load("Avatar/root.fbx");
             m_RootInstance = (GameObject)UnityEngine.Object.Instantiate(original4, Vector3.zero, Quaternion.identity);
             InitInstantiatedPreviewRecursive(m_RootInstance);
+            AddSingleGO(m_RootInstance);
         }
         m_ShowReference = EditorPrefs.GetBool("AvatarpreviewShowReference", true);
         SetPreviewCharacterEnabled(false, false);
@@ -379,12 +391,12 @@ public class ParticleSystemPreview : ObjectPreview
         Quaternion pivotRot = quaternion;
         PositionPreviewObjects(pivotRot, pivotPos, quaternion2, bodyPosition, directionRot, quaternion, vector, directionPos, m_AvatarScale);
 
-        m_PreviewUtility.m_Camera.nearClipPlane = 0.5f * m_ZoomFactor;
-        m_PreviewUtility.m_Camera.farClipPlane = 100f * m_AvatarScale;
+        GetPreviewCamera().nearClipPlane = 0.5f * m_ZoomFactor;
+        GetPreviewCamera().farClipPlane = 100f * m_AvatarScale;
         Quaternion rotation = Quaternion.Euler(-m_PreviewDir.y, -m_PreviewDir.x, 0f);
         Vector3 position2 = rotation * (Vector3.forward * -5.5f * m_ZoomFactor) + bodyPosition + m_PivotPositionOffset;
-        m_PreviewUtility.m_Camera.transform.position = position2;
-        m_PreviewUtility.m_Camera.transform.rotation = rotation;
+        GetPreviewCamera().transform.position = position2;
+        GetPreviewCamera().transform.rotation = rotation;
 
         Quaternion identity = Quaternion.identity;
         Vector3 position = new Vector3(0f, 0f, 0f);
@@ -393,10 +405,10 @@ public class ParticleSystemPreview : ObjectPreview
         Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * m_AvatarScale);
         floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / m_AvatarScale);
         floorMaterial.SetVector("_Alphas", new Vector4(0.5f * 1f, 0.3f * 1f, 0f, 0f));
-        Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, m_PreviewUtility.m_Camera, 0);
+        Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, GetPreviewCamera(), 0);
 
         SetPreviewCharacterEnabled(true, m_ShowReference);
-        m_PreviewUtility.m_Camera.Render();
+        GetPreviewCamera().Render();
         SetPreviewCharacterEnabled(false, false);
         TeardownPreviewLightingAndFx(oldFog);
     }
@@ -406,6 +418,7 @@ public class ParticleSystemPreview : ObjectPreview
         DestroyPreviewInstances();
         GameObject gameObject = UnityEngine.Object.Instantiate(target) as GameObject;
         InitInstantiatedPreviewRecursive(gameObject);
+        AddSingleGO(gameObject);
         Animator component = gameObject.GetComponent<Animator>();
         if (component)
         {
@@ -442,13 +455,34 @@ public class ParticleSystemPreview : ObjectPreview
         UnityEngine.Object.DestroyImmediate(m_DirectionInstance);
     }
 
+    private void AddSingleGO(GameObject go)
+    {
+#if UNITY_2017_1_OR_NEWER
+        m_PreviewUtility.AddSingleGO(go);
+#endif
+    }
+
+    private Camera GetPreviewCamera()
+    {
+#if UNITY_2017_1_OR_NEWER
+        return m_PreviewUtility.camera;
+#else
+        return m_PreviewUtility.m_Camera;
+#endif
+    }
+
     private bool SetupPreviewLightingAndFx()
     {
-        m_PreviewUtility.m_Light[0].intensity = 1.4f;
-        m_PreviewUtility.m_Light[0].transform.rotation = Quaternion.Euler(40f, 40f, 0f);
-        m_PreviewUtility.m_Light[1].intensity = 1.4f;
+#if UNITY_2017_1_OR_NEWER
+        Light[] lights = m_PreviewUtility.lights;
+#else
+        Light[] lights = m_PreviewUtility.m_Light;
+#endif
+        lights[0].intensity = 1.4f;
+        lights[0].transform.rotation = Quaternion.Euler(40f, 40f, 0f);
+        lights[1].intensity = 1.4f;
         Color ambient = new Color(0.1f, 0.1f, 0.1f, 0f);
-        InternalEditorUtility.SetCustomLighting(m_PreviewUtility.m_Light, ambient);
+        InternalEditorUtility.SetCustomLighting(lights, ambient);
         bool fog = RenderSettings.fog;
         Unsupported.SetRenderSettingsUseFogNoDirty(false);
         return fog;
@@ -715,7 +749,7 @@ public class ParticleSystemPreview : ObjectPreview
 
     public void DoAvatarPreviewPan(Event evt)
     {
-        Camera camera = m_PreviewUtility.m_Camera;
+        Camera camera = GetPreviewCamera();
         Vector3 vector = camera.WorldToScreenPoint(bodyPosition + m_PivotPositionOffset);
         Vector3 a = new Vector3(-evt.delta.x, evt.delta.y, 0f);
         vector += a * Mathf.Lerp(0.25f, 2f, m_ZoomFactor * 0.5f);
@@ -749,7 +783,7 @@ public class ParticleSystemPreview : ObjectPreview
 
     protected Vector3 GetCurrentMouseWorldPosition(Event evt, Rect previewRect)
     {
-        Camera camera = m_PreviewUtility.m_Camera;
+        Camera camera = GetPreviewCamera();
         float scaleFactor = m_PreviewUtility.GetScaleFactor(previewRect.width, previewRect.height);
         return camera.ScreenToWorldPoint(new Vector3((evt.mousePosition.x - previewRect.x) * scaleFactor, (previewRect.height - (evt.mousePosition.y - previewRect.y)) * scaleFactor, 0f)
         {
