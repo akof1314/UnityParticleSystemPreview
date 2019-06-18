@@ -49,7 +49,7 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
     void OnDisable()
     {
         preview.OnDestroy();
-        DestroyImmediate(baseEditor);
+        //DestroyImmediate(baseEditor);
     }
 
     private bool HasParticleSystemPreview()
