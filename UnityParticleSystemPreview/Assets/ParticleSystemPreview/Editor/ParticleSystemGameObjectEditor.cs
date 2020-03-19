@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Reflection;
+using UnityEngine;
 using UnityEditor;
 
 [CustomEditor(typeof(GameObject)), CanEditMultipleObjects]
@@ -48,7 +49,7 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
     void OnDisable()
     {
         preview.OnDestroy();
-        DestroyImmediate(baseEditor);
+        //DestroyImmediate(baseEditor);
     }
 
     private bool HasParticleSystemPreview()
@@ -138,6 +139,20 @@ public class ParticleSystemGameObjectEditor : OverrideEditor
         else
         {
             baseEditor.ReloadPreviewInstances();
+        }
+    }
+
+    /// <summary>
+    /// 需要调用 GameObjectInspector 的场景拖曳，否则无法拖动物体到 Scene 视图
+    /// </summary>
+    /// <param name="sceneView"></param>
+    public void OnSceneDrag(SceneView sceneView)
+    {
+        System.Type t = baseEditor.GetType();
+        MethodInfo onSceneDragMi = t.GetMethod("OnSceneDrag", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (onSceneDragMi != null)
+        {
+            onSceneDragMi.Invoke(baseEditor, new object[1] { sceneView });
         }
     }
 }
