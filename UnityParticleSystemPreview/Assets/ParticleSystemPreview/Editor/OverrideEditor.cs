@@ -2,79 +2,82 @@
 using UnityEditor;
 using UnityEngine;
 
-// thanks to Sprite Animation Preview
-public abstract class OverrideEditor : Editor
+namespace WuHuan
 {
-    readonly MethodInfo methodInfo = typeof (Editor).GetMethod("OnHeaderGUI",
-        BindingFlags.NonPublic | BindingFlags.Instance);
-
-    private Editor m_BaseEditor;
-
-    protected Editor baseEditor
+    // thanks to Sprite Animation Preview
+    public abstract class OverrideEditor : Editor
     {
-        get { return m_BaseEditor ?? (m_BaseEditor = GetBaseEditor()); }
-        set { m_BaseEditor = value; }
-    }
+        readonly MethodInfo methodInfo = typeof(Editor).GetMethod("OnHeaderGUI",
+            BindingFlags.NonPublic | BindingFlags.Instance);
 
-    protected abstract Editor GetBaseEditor();
+        private Editor m_BaseEditor;
 
-    public override void OnInspectorGUI()
-    {
-        baseEditor.OnInspectorGUI();
-    }
+        protected Editor baseEditor
+        {
+            get { return m_BaseEditor ?? (m_BaseEditor = GetBaseEditor()); }
+            set { m_BaseEditor = value; }
+        }
 
-    public override bool HasPreviewGUI()
-    {
-        return baseEditor.HasPreviewGUI();
-    }
+        protected abstract Editor GetBaseEditor();
 
-    public override GUIContent GetPreviewTitle()
-    {
-        return baseEditor.GetPreviewTitle();
-    }
+        public override void OnInspectorGUI()
+        {
+            baseEditor.OnInspectorGUI();
+        }
 
-    public override Texture2D RenderStaticPreview(string assetPath, Object[] subAssets, int width, int height)
-    {
-        return baseEditor.RenderStaticPreview(assetPath, subAssets, width, height);
-    }
+        public override bool HasPreviewGUI()
+        {
+            return baseEditor.HasPreviewGUI();
+        }
 
-    public override void OnPreviewGUI(Rect r, GUIStyle background)
-    {
-        baseEditor.OnPreviewGUI(r, background);
-    }
+        public override GUIContent GetPreviewTitle()
+        {
+            return baseEditor.GetPreviewTitle();
+        }
 
-    public override void OnInteractivePreviewGUI(Rect r, GUIStyle background)
-    {
-        baseEditor.OnInteractivePreviewGUI(r, background);
-    }
+        public override Texture2D RenderStaticPreview(string assetPath, Object[] subAssets, int width, int height)
+        {
+            return baseEditor.RenderStaticPreview(assetPath, subAssets, width, height);
+        }
 
-    public override void OnPreviewSettings()
-    {
-        baseEditor.OnPreviewSettings();
-    }
+        public override void OnPreviewGUI(Rect r, GUIStyle background)
+        {
+            baseEditor.OnPreviewGUI(r, background);
+        }
 
-    public override string GetInfoString()
-    {
-        return baseEditor.GetInfoString();
-    }
+        public override void OnInteractivePreviewGUI(Rect r, GUIStyle background)
+        {
+            baseEditor.OnInteractivePreviewGUI(r, background);
+        }
 
-    public override void ReloadPreviewInstances()
-    {
-        baseEditor.ReloadPreviewInstances();
-    }
+        public override void OnPreviewSettings()
+        {
+            baseEditor.OnPreviewSettings();
+        }
 
-    protected override void OnHeaderGUI()
-    {
-        methodInfo.Invoke(baseEditor, new object[0]);
-    }
+        public override string GetInfoString()
+        {
+            return baseEditor.GetInfoString();
+        }
 
-    public override bool RequiresConstantRepaint()
-    {
-        return baseEditor.RequiresConstantRepaint();
-    }
+        public override void ReloadPreviewInstances()
+        {
+            baseEditor.ReloadPreviewInstances();
+        }
 
-    public override bool UseDefaultMargins()
-    {
-        return baseEditor.UseDefaultMargins();
+        protected override void OnHeaderGUI()
+        {
+            methodInfo.Invoke(baseEditor, new object[0]);
+        }
+
+        public override bool RequiresConstantRepaint()
+        {
+            return baseEditor.RequiresConstantRepaint();
+        }
+
+        public override bool UseDefaultMargins()
+        {
+            return baseEditor.UseDefaultMargins();
+        }
     }
 }
