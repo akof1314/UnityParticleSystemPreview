@@ -10,7 +10,11 @@ namespace WuHuan
         private class Styles
         {
             public GUIContent ps = new GUIContent("PS", "Show particle system preview");
+#if UNITY_2019_3_OR_NEWER
+            public GUIStyle preButton = EditorStyles.toolbarButton;
+#else
             public GUIStyle preButton = "preButton";
+#endif
         }
 
         private bool m_ShowParticlePreview;
@@ -51,7 +55,11 @@ namespace WuHuan
 
         void OnDisable()
         {
-            preview.OnDestroy();
+            if (m_Preview != null)
+            {
+                m_Preview.OnDestroy();
+                m_Preview = null;
+            }
             //DestroyImmediate(baseEditor);
         }
 

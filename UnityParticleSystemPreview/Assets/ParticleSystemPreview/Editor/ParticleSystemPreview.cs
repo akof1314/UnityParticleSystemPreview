@@ -20,9 +20,19 @@ namespace WuHuan
                 IconContent("preAudioPlayOn", "Stop")
             };
 
+            public GUIContent[] autoPlayIcons = new GUIContent[2]
+            {
+                IconContent("preAudioAutoPlayOff", "Turn Auto Play on/off"),
+                IconContent("preAudioAutoPlayOff", "Turn Auto Play on/off")
+            };
+
             public GUIContent lockParticleSystem = IconContent("IN LockButton", "Lock the current particle");
             public GUIContent reload = new GUIContent("Reload", "Reload particle preview");
+#if UNITY_2019_3_OR_NEWER
+            public GUIStyle preButton = EditorStyles.toolbarButton;
+#else
             public GUIStyle preButton = "preButton";
+#endif
             public GUIStyle preSlider = "preSlider";
             public GUIStyle preSliderThumb = "preSliderThumb";
             public GUIStyle preLabel = "preLabel";
@@ -77,6 +87,7 @@ namespace WuHuan
         private float m_BoundingVolumeScale;
         protected ViewTool m_ViewTool;
         private bool m_ShowReference;
+        private bool m_AutoPlay;
         private bool m_Loaded;
         private int m_PreviewHint = "Preview".GetHashCode();
         private int m_PreviewSceneHint = "PreviewSene".GetHashCode();
@@ -272,6 +283,12 @@ namespace WuHuan
                     SimulateDisable();
                 }
             }
+            EditorGUI.BeginChangeCheck();
+            m_AutoPlay = CycleButton(m_AutoPlay ? 1 : 0, s_Styles.autoPlayIcons, s_Styles.preButton) == 1;
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetBool("AvatarpreviewAutoPlayAudio", m_AutoPlay);
+            }
 
             GUILayout.Box(s_Styles.speedScale, s_Styles.preLabel);
             EditorGUI.BeginChangeCheck();
@@ -391,7 +408,13 @@ namespace WuHuan
             }
 
             m_ShowReference = EditorPrefs.GetBool("AvatarpreviewShowReference", true);
+            m_AutoPlay = EditorPrefs.GetBool("AvatarpreviewAutoPlayAudio", false);
             SetPreviewCharacterEnabled(false, false);
+
+            if (m_AutoPlay)
+            {
+                SimulateEnable();
+            }
         }
 
         private bool HasStaticPreview()
@@ -965,6 +988,10 @@ namespace WuHuan
 
         private static int CycleButton(int selected, GUIContent[] contents, GUIStyle style)
         {
+#if UNITY_2019_3_OR_NEWER
+            bool flag = GUILayout.Toggle(selected == 1, contents[selected], style);
+            return flag ? 1 : 0;
+#else
             bool flag = GUILayout.Button(contents[selected], style);
             if (flag)
             {
@@ -978,6 +1005,7 @@ namespace WuHuan
             }
 
             return selected;
+#endif
         }
 
         private static GUIContent IconContent(string name, string tooltip)
