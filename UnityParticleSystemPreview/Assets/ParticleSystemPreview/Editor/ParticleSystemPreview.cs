@@ -489,6 +489,28 @@ namespace WuHuan
                 component.fireEvents = false;
             }
 
+            // 解决同级多个粒子系统
+            if (gameObject.GetComponent<ParticleSystem>() == null)
+            {
+                int particleCount = 0;
+                var tf = gameObject.transform;
+                for (int i = 0; i < tf.childCount; i++)
+                {
+                    if (tf.GetChild(i).GetComponentInChildren<ParticleSystem>(true))
+                    {
+                        particleCount++;
+                    }
+
+                    if (particleCount > 1)
+                    {
+                        var ps = gameObject.AddComponent<ParticleSystem>();
+                        var em = ps.emission;
+                        em.enabled = false;
+                        break;
+                    }
+                }
+            }
+
             m_PreviewInstance = gameObject;
             //Debug.Log("OnCreate");
 
