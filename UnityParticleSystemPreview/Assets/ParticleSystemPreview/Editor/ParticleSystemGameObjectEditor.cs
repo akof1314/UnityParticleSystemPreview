@@ -11,6 +11,7 @@ namespace WuHuan
         private static Type s_GameObjectType;
         private static MethodInfo s_OnSceneDragMethodInfo;
         private static FieldInfo s_PreviewCacheFieldInfo;
+        private static PropertyInfo s_TargetIndexPropertyInfo;
 
         private class Styles
         {
@@ -49,11 +50,15 @@ namespace WuHuan
         {
             if (s_GameObjectType == null)
             {
-                s_GameObjectType = typeof(Editor).Assembly.GetType("UnityEditor.GameObjectInspector");
+                var assembly = typeof(Editor).Assembly;
+                s_GameObjectType = assembly.GetType("UnityEditor.GameObjectInspector");
                 s_OnSceneDragMethodInfo = s_GameObjectType.GetMethod("OnSceneDrag",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 s_PreviewCacheFieldInfo = s_GameObjectType.GetField("m_PreviewCache",
                     BindingFlags.Instance | BindingFlags.NonPublic);
+                Type realTypeEditor = assembly.GetType("UnityEditor.Editor");
+                s_TargetIndexPropertyInfo = realTypeEditor.GetProperty("referenceTargetIndex",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
             }
 
             Editor editor = null;
@@ -120,6 +125,7 @@ namespace WuHuan
             }
             else
             {
+                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
                 baseEditor.OnPreviewGUI(r, background);
             }
         }
