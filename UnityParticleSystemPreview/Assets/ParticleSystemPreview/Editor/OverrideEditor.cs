@@ -20,6 +20,11 @@ namespace WuHuan
 
         protected abstract Editor GetBaseEditor();
 
+        protected bool HasBaseEditor()
+        {
+            return m_BaseEditor != null;
+        }
+
         public override void OnInspectorGUI()
         {
             baseEditor.OnInspectorGUI();
