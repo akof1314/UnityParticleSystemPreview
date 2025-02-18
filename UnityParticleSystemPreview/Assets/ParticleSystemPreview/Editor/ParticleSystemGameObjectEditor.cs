@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using UnityEngine;
 using UnityEditor;
 
@@ -7,6 +8,9 @@ namespace WuHuan
     [CustomEditor(typeof(GameObject)), CanEditMultipleObjects]
     public class ParticleSystemGameObjectEditor : OverrideEditor
     {
+        private static Type s_GameObjectType;
+        private static MethodInfo s_OnSceneDragMethodInfo;
+
         private class Styles
         {
             public GUIContent ps = new GUIContent("PS", "Show particle system preview");
@@ -42,8 +46,15 @@ namespace WuHuan
 
         protected override Editor GetBaseEditor()
         {
+            if (s_GameObjectType == null)
+            {
+                s_GameObjectType = typeof(Editor).Assembly.GetType("UnityEditor.GameObjectInspector");
+                s_OnSceneDragMethodInfo = s_GameObjectType.GetMethod("OnSceneDrag",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+
             Editor editor = null;
-            var baseType = typeof(Editor).Assembly.GetType("UnityEditor.GameObjectInspector");
+            var baseType = s_GameObjectType;
             CreateCachedEditor(targets, baseType, ref editor);
             return editor;
         }
@@ -159,16 +170,22 @@ namespace WuHuan
         /// <summary>
         /// 需要调用 GameObjectInspector 的场景拖曳，否则无法拖动物体到 Scene 视图
         /// </summary>
-        /// <param name="sceneView"></param>
-        public void OnSceneDrag(SceneView sceneView)
+#if UNITY_2020_2_OR_NEWER
+        public void OnSceneDrag(SceneView sceneView, int index)
         {
-            System.Type t = baseEditor.GetType();
-            MethodInfo onSceneDragMi = t.GetMethod("OnSceneDrag",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (onSceneDragMi != null)
+            if (s_OnSceneDragMethodInfo != null)
             {
-                onSceneDragMi.Invoke(baseEditor, new object[1] { sceneView });
+                s_OnSceneDragMethodInfo.Invoke(baseEditor, new object[] { sceneView, index });
             }
         }
+#else
+        public void OnSceneDrag(SceneView sceneView)
+        {
+            if (s_OnSceneDragMethodInfo != null)
+            {
+                s_OnSceneDragMethodInfo.Invoke(baseEditor, new object[] { sceneView });
+            }
+        }
+#endif
     }
 }
