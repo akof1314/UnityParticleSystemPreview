@@ -77,6 +77,9 @@ namespace WuHuan
             if (m_Preview != null)
             {
                 m_Preview.OnDestroy();
+#if UNITY_2021_1_OR_NEWER
+                m_Preview.Cleanup();
+#endif
                 m_Preview = null;
             }
 
@@ -125,7 +128,6 @@ namespace WuHuan
             }
             else
             {
-                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
                 baseEditor.OnPreviewGUI(r, background);
             }
         }
@@ -138,6 +140,7 @@ namespace WuHuan
             }
             else
             {
+                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
                 baseEditor.OnInteractivePreviewGUI(r, background);
             }
         }
