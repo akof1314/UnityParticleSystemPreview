@@ -10,6 +10,8 @@ namespace WuHuan
     {
         private static Type s_GameObjectType;
         private static MethodInfo s_OnSceneDragMethodInfo;
+        private static MethodInfo s_OnEnableMethodInfo;
+        private static MethodInfo s_OnDisableMethodInfo;
 
         private class Styles
         {
@@ -51,6 +53,10 @@ namespace WuHuan
                 s_GameObjectType = typeof(Editor).Assembly.GetType("UnityEditor.GameObjectInspector");
                 s_OnSceneDragMethodInfo = s_GameObjectType.GetMethod("OnSceneDrag",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                s_OnEnableMethodInfo = s_GameObjectType.GetMethod("OnEnable",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                s_OnDisableMethodInfo = s_GameObjectType.GetMethod("OnDisable",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             }
 
             Editor editor = null;
@@ -61,11 +67,19 @@ namespace WuHuan
 
         void OnEnable()
         {
+            if (s_OnEnableMethodInfo != null)
+            {
+                s_OnEnableMethodInfo.Invoke(baseEditor, null);
+            }
             m_ShowParticlePreview = true;
         }
 
         void OnDisable()
         {
+            if (s_OnDisableMethodInfo != null)
+            {
+                s_OnDisableMethodInfo.Invoke(baseEditor, null);
+            }
             if (m_Preview != null)
             {
                 m_Preview.OnDestroy();

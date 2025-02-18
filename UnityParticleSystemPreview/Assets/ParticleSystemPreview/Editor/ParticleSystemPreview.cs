@@ -453,6 +453,10 @@ namespace WuHuan
             GetPreviewCamera().transform.position = position2;
             GetPreviewCamera().transform.rotation = rotation;
 
+            SetPreviewCharacterEnabled(true, m_ShowReference);
+            m_PreviewUtility.Render(true);
+            SetPreviewCharacterEnabled(false, false);
+
             Quaternion identity = Quaternion.identity;
             Vector3 position = new Vector3(0f, 0f, 0f);
             position = m_ReferenceInstance.transform.position;
@@ -460,11 +464,13 @@ namespace WuHuan
             Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * m_AvatarScale);
             floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / m_AvatarScale);
             floorMaterial.SetVector("_Alphas", new Vector4(0.5f * 1f, 0.3f * 1f, 0f, 0f));
+            floorMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Background;
             Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, GetPreviewCamera(), 0);
 
-            SetPreviewCharacterEnabled(true, m_ShowReference);
-            GetPreviewCamera().Render();
-            SetPreviewCharacterEnabled(false, false);
+            var clearMode = GetPreviewCamera().clearFlags;
+            GetPreviewCamera().clearFlags = CameraClearFlags.Nothing;
+            m_PreviewUtility.Render(false);
+            GetPreviewCamera().clearFlags = clearMode;
             TeardownPreviewLightingAndFx(oldFog);
         }
 
