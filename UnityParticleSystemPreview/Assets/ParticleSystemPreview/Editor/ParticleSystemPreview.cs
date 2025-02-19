@@ -98,12 +98,13 @@ namespace WuHuan
         private float m_RunningTime;
         private double m_PreviousTime;
         private float m_PlaybackSpeed = 1f;
-        private bool m_LockParticleSystem = true;
+        private bool m_IsLockParticleSystem = true;
         private bool m_HasPreview;
         private Editor m_CacheEditor;
         private const float kDuration = 99f;
         private static int PreviewCullingLayer = 31;
         private static Styles s_Styles;
+        private static bool s_IsStopParticlePlay;
 
         public Vector3 bodyPosition
         {
@@ -274,7 +275,7 @@ namespace WuHuan
             }
 
             //EditorGUI.BeginChangeCheck();
-            //m_LockParticleSystem = GUILayout.Toggle(m_LockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
+            //m_IsLockParticleSystem = GUILayout.Toggle(m_IsLockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
             //if (EditorGUI.EndChangeCheck())
             //{
             //    SetSimulateMode();
@@ -644,14 +645,14 @@ namespace WuHuan
         /// </summary>
         private void SimulateEnable()
         {
-            SimulateDisable();
             SetSimulateMode();
-            if (m_LockParticleSystem)
+            if (m_IsLockParticleSystem)
             {
                 ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
                 if (particleSystem)
                 {
                     particleSystem.Play();
+                    s_IsStopParticlePlay = false;
                     ParticleSystemEditorUtilsReflect.editorIsScrubbing = false;
                 }
             }
@@ -669,11 +670,12 @@ namespace WuHuan
         /// </summary>
         private void SimulateDisable()
         {
-            if (m_LockParticleSystem)
+            if (m_IsLockParticleSystem)
             {
                 ParticleSystemEditorUtilsReflect.editorIsScrubbing = false;
                 ParticleSystemEditorUtilsReflect.editorPlaybackTime = 0f;
                 ParticleSystemEditorUtilsReflect.StopEffect();
+                s_IsStopParticlePlay = true;
             }
 
             EditorApplication.update -= InspectorUpdate;
@@ -687,8 +689,14 @@ namespace WuHuan
         /// </summary>
         private void SimulateUpdate()
         {
-            if (m_LockParticleSystem)
+            if (m_IsLockParticleSystem)
             {
+                if (s_IsStopParticlePlay)
+                {
+                    // ObjectSelector 的时候，先创建新的再销毁旧的，导致新的停止播放，这里尝试一次
+                    s_IsStopParticlePlay = false;
+                    SimulateEnable();
+                }
                 Repaint();
                 return;
             }
@@ -727,7 +735,7 @@ namespace WuHuan
                 ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
                 if (particleSystem)
                 {
-                    if (m_LockParticleSystem)
+                    if (m_IsLockParticleSystem)
                     {
                         if (ParticleSystemEditorUtilsReflect.lockedParticleSystem != particleSystem)
                         {
@@ -744,12 +752,13 @@ namespace WuHuan
 
         private void Repaint()
         {
-            // EditorWindow ew = EditorWindow.focusedWindow;
-            // if (ew )
-            // {
-            //     ew.Repaint();
-            //     return;
-            // }
+            // 让选择对象框也能刷新
+            EditorWindow ew = EditorWindow.focusedWindow;
+            if (ew && ew.titleContent.text.StartsWith("Select ", StringComparison.Ordinal))
+            {
+                ew.Repaint();
+                return;
+            }
             if (m_CacheEditor)
             {
                 m_CacheEditor.Repaint();
@@ -766,7 +775,7 @@ namespace WuHuan
                 ParticleSystem particleSystem = m_PreviewInstance.GetComponentInChildren<ParticleSystem>(true);
                 if (particleSystem)
                 {
-                    if (m_LockParticleSystem && ParticleSystemEditorUtilsReflect.lockedParticleSystem == particleSystem)
+                    if (m_IsLockParticleSystem && ParticleSystemEditorUtilsReflect.lockedParticleSystem == particleSystem)
                     {
                         ParticleSystemEditorUtilsReflect.lockedParticleSystem = null;
                     }
