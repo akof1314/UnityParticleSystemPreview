@@ -13,6 +13,7 @@ namespace WuHuan
         {
             public GUIContent speedScale = IconContent("SpeedScale", "Changes particle preview speed");
             public GUIContent pivot = IconContent("AvatarPivot", "Displays avatar's pivot and mass center");
+            public GUIContent floor = IconContent("CheckerFloor", "Displays floor plane");
 
             public GUIContent[] play = new GUIContent[2]
             {
@@ -87,6 +88,7 @@ namespace WuHuan
         private float m_BoundingVolumeScale;
         protected ViewTool m_ViewTool;
         private bool m_ShowReference;
+        private bool m_ShowFloor;
         private bool m_AutoPlay;
         private bool m_Loaded;
         private int m_PreviewHint = "Preview".GetHashCode();
@@ -264,6 +266,13 @@ namespace WuHuan
                 EditorPrefs.SetBool("AvatarpreviewShowReference", m_ShowReference);
             }
 
+            EditorGUI.BeginChangeCheck();
+            m_ShowFloor = GUILayout.Toggle(m_ShowFloor, s_Styles.floor, s_Styles.preButton);
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetBool("AvatarpreviewShowFloor", m_ShowFloor);
+            }
+
             //EditorGUI.BeginChangeCheck();
             //m_LockParticleSystem = GUILayout.Toggle(m_LockParticleSystem, s_Styles.lockParticleSystem, s_Styles.preButton);
             //if (EditorGUI.EndChangeCheck())
@@ -408,6 +417,7 @@ namespace WuHuan
             }
 
             m_ShowReference = EditorPrefs.GetBool("AvatarpreviewShowReference", true);
+            m_ShowFloor = EditorPrefs.GetBool("AvatarpreviewShowFloor", true);
             m_AutoPlay = EditorPrefs.GetBool("AvatarpreviewAutoPlayAudio", false);
             SetPreviewCharacterEnabled(false, false);
 
@@ -457,15 +467,18 @@ namespace WuHuan
             m_PreviewUtility.Render(true);
             SetPreviewCharacterEnabled(false, false);
 
-            Quaternion identity = Quaternion.identity;
-            Vector3 position = new Vector3(0f, 0f, 0f);
-            position = m_ReferenceInstance.transform.position;
-            Material floorMaterial = m_FloorMaterial;
-            Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * m_AvatarScale);
-            floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / m_AvatarScale);
-            floorMaterial.SetVector("_Alphas", new Vector4(0.5f * 1f, 0.3f * 1f, 0f, 0f));
-            floorMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Background;
-            Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, GetPreviewCamera(), 0);
+            if (m_ShowFloor)
+            {
+                Quaternion identity = Quaternion.identity;
+                Vector3 position = new Vector3(0f, 0f, 0f);
+                position = m_ReferenceInstance.transform.position;
+                Material floorMaterial = m_FloorMaterial;
+                Matrix4x4 matrix2 = Matrix4x4.TRS(position, identity, Vector3.one * 5f * m_AvatarScale);
+                floorMaterial.mainTextureOffset = -new Vector2(position.x, position.z) * 5f * 0.08f * (1f / m_AvatarScale);
+                floorMaterial.SetVector("_Alphas", new Vector4(0.5f * 1f, 0.3f * 1f, 0f, 0f));
+                floorMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Background;
+                Graphics.DrawMesh(m_FloorPlane, matrix2, floorMaterial, PreviewCullingLayer, GetPreviewCamera(), 0);
+            }
 
             var clearMode = GetPreviewCamera().clearFlags;
             GetPreviewCamera().clearFlags = CameraClearFlags.Nothing;
@@ -731,13 +744,12 @@ namespace WuHuan
 
         private void Repaint()
         {
-            /* 如果有使用 https://github.com/akof1314/ObjectPickerAdvanced
-            EditorWindow ew = EditorWindow.focusedWindow;
-            if (ew && ew as ObjectSelectorWindow)
-            {
-                ew.Repaint();
-                return;
-            }*/
+            // EditorWindow ew = EditorWindow.focusedWindow;
+            // if (ew )
+            // {
+            //     ew.Repaint();
+            //     return;
+            // }
             if (m_CacheEditor)
             {
                 m_CacheEditor.Repaint();
