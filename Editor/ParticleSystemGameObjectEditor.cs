@@ -128,7 +128,7 @@ namespace WuHuan
             }
             else
             {
-                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
+                SetEditorTargetIndex();
                 baseEditor.OnPreviewGUI(r, background);
             }
         }
@@ -141,7 +141,7 @@ namespace WuHuan
             }
             else
             {
-                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
+                SetEditorTargetIndex();
                 baseEditor.OnInteractivePreviewGUI(r, background);
             }
         }
@@ -217,6 +217,12 @@ namespace WuHuan
                 }
                 return false;
             }
+        }
+
+        private void SetEditorTargetIndex()
+        {
+            var newVal = s_TargetIndexPropertyInfo.GetValue(this, null);
+            s_TargetIndexPropertyInfo.SetValue(baseEditor, newVal, null);
         }
     }
 }
