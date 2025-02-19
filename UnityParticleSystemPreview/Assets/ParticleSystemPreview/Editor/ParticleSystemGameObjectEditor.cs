@@ -128,6 +128,7 @@ namespace WuHuan
             }
             else
             {
+                s_TargetIndexPropertyInfo.SetValue(baseEditor, s_TargetIndexPropertyInfo.GetValue(this));
                 baseEditor.OnPreviewGUI(r, background);
             }
         }
