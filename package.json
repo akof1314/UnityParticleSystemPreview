@@ -1,0 +1,19 @@
+{
+  "name": "com.wuhuan.particlesystempreview",
+  "displayName": "Particle System Preview",
+  "version": "1.0.0",
+  "documentationUrl": "https://github.com/akof1314/UnityParticleSystemPreview",
+  "description": "Unity ParticleSystem Preview 粒子预览插件",
+  "category": "Editor",
+  "author": {
+    "name": "Wuhuan",
+    "url": "https://github.com/akof1314"
+  },
+  "samples": [
+    {
+      "displayName": "Simple Demo",
+      "description": "一个简单的示例。",
+      "path": "Samples~"
+    }
+  ]
+}
